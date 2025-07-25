@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Topbar from "@/components/layout/Topbar";
+import ClientLayout from "@/components/layout/Layout";
 
 export const metadata: Metadata = {
   title: "FGCScout",
@@ -12,13 +13,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
+return (
     <html lang="en">
       <body
         className={`antialiased`}
       >
-        <Topbar />
-        {children}
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );
