@@ -3,13 +3,10 @@
 
 import Link from "next/link";
 import SearchBar from "../ui/Search";
-import { Menu } from "lucide-react";
+import MobileSidebar from "./MobileSidebar";
 
-export interface TopbarProps {
-  toggleSidebar: () => void;
-}
 
-export default function Topbar({ toggleSidebar }: TopbarProps) {
+export default function Topbar() {
   const handleSearch = (searchTerm: string) => {
     console.log("Searching for:", searchTerm);
   };
@@ -18,13 +15,7 @@ export default function Topbar({ toggleSidebar }: TopbarProps) {
     <div className="fixed inset-x-0 w-full px-6 py-4 top-0 h-16 bg-gray-800 z-50">
       <div className="h-full flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10">
         <div className="flex items-center space-x-2 sm:space-x-3">
-          <button
-            className="flex 2xl:hidden hover:bg-gray-700 rounded-full h-8 w-8 items-center justify-center text-white"
-            onClick={toggleSidebar}
-            aria-label="Toggle Sidebar"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          <MobileSidebar />
           <Link
             href="/"
             className="truncate text-lg sm:text-xl font-bold text-white pb-1"
