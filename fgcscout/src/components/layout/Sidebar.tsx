@@ -26,7 +26,7 @@ export default function Sidebar() {
 
     return (
         <aside
-            className='sticky left-0 top-16 flex h-sreen w-fit flex-col justify-between bg-gray-950 pt-18 text-white max-sm:hidden lg:w-70'>
+            className='sticky left-0 top-16 flex h-sreen w-fit flex-col justify-between bg-gray-950 pt-18 text-white max-2xl:hidden lg:w-70'>
             <div className="flex-1 flex flex-col p-4 space-y-6 overflow-y-auto">
                 <nav className="flex-1 flex-col space-y-3">
                     {mainNavItems.map((item) => {
