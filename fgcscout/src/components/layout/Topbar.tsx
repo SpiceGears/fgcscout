@@ -1,3 +1,4 @@
+// components/layout/Topbar.tsx (no changes needed from what you provided)
 "use client"
 
 import Link from "next/link";
@@ -8,21 +9,25 @@ export interface TopbarProps {
   toggleSidebar: () => void;
 }
 
-export default function Topbar({ toggleSidebar  }: TopbarProps) {
+export default function Topbar({ toggleSidebar }: TopbarProps) {
   const handleSearch = (searchTerm: string) => {
     console.log("Searching for:", searchTerm);
   };
 
   return (
-    <div className="fixed inset-x-0 top-0 h-16 bg-gray-800">
-      <div className="h-full flex items-center justify-between px-4 sn:px-6 md:px-8 lg:px-10">
+    <div className="fixed inset-x-0 w-full px-6 py-4 top-0 h-16 bg-gray-800 z-50">
+      <div className="h-full flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10">
         <div className="flex items-center space-x-2 sm:space-x-3">
-          <button className="hover:bg-gray-700 rounded-full h-8 w-8 flex items-center justify-center" onClick={toggleSidebar}>
+          <button
+            className="flex 2xl:hidden hover:bg-gray-700 rounded-full h-8 w-8 items-center justify-center text-white"
+            onClick={toggleSidebar}
+            aria-label="Toggle Sidebar"
+          >
             <Menu className="h-5 w-5" />
           </button>
           <Link
             href="/"
-            className="truncate text-lg sm:text-xl font-bold text-white"
+            className="truncate text-lg sm:text-xl font-bold text-white pb-1"
           >
             FGC Scout
           </Link>
