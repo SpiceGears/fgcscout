@@ -41,7 +41,7 @@ export default function MobileSidebar() {
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-                <button className="flex 2xl:hidden hover:bg-gray-700 rounded-full h-8 w-8 items-center justify-center text-white" aria-label="Toggle Mobile Menu">
+                <button className="flex 2xl:hidden hover:bg-green-700 rounded-full h-8 w-8 items-center justify-center text-white" aria-label="Toggle Mobile Menu">
                     <Menu className="h-5 w-5" />
                 </button>
             </SheetTrigger>

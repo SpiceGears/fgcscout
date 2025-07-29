@@ -15,17 +15,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`antialiased`}>
-        <div className="flex min-h-screen">
+      <body className="antialiased">
+        <Topbar />
+        <div className="flex flex-grow mt-16">
           <Sidebar />
-
-          <div className="flex flex-col flex-1 mt-16">
-            <Topbar />
-
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
-          </div>
+          <main className="flex-1 transition-all duration-300 ease-in-out 2xl:ml-70">
+            {children}
+          </main>
         </div>
       </body>
     </html>

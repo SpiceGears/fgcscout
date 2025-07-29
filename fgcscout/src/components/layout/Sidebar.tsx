@@ -12,10 +12,13 @@ export default function Sidebar() {
         <aside
             className="
         fixed left-0 flex h-screen
-        w-0 overflow-hidden
-        flex-col justify-between bg-gray-900 pt-18 text-white
-        2xl:w-70
-        transition-all duration-300 ease-in-out
+        overflow-hidden
+        flex-col justify-between bg-gray-900 pt-18 text-gray-50
+        z-30
+        w-70
+        2xl:translate-x-0
+        transform transition-transform duration-300 ease-in-out
+        -translate-x-full
       "
         >
             <div className="flex-1 flex flex-col p-4 space-y-6">
