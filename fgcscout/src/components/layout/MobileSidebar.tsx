@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from 'react';
-
 import {
   Sheet,
   SheetContent,
@@ -13,7 +12,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
-
 import { Home, Users, CalendarDays, Info, ScrollText, Code, Swords } from "lucide-react";
 import { FaGithub } from 'react-icons/fa';
 
@@ -62,8 +60,8 @@ export default function MobileSidebar() {
                                     href={item.href}
                                     className={`
                                         flex items-center gap-3 p-2 rounded
-                                        hover:bg-gray-700
-                                        ${isActive ? 'bg-gray-800 font-bold' : ''}
+                                        hover:bg-sky-700
+                                        ${isActive ? 'bg-sky-800 font-bold' : ''}
                                     `}
                                     onClick={handleLinkClick}
                                 >
@@ -88,8 +86,8 @@ export default function MobileSidebar() {
                                     href={item.href}
                                     className={`
                                         flex items-center gap-3 p-2 rounded
-                                        hover:bg-gray-700
-                                        ${isActive ? 'bg-gray-800 font-bold' : ''}
+                                        hover:bg-sky-700
+                                        ${isActive ? 'bg-sky-800 font-bold' : ''}
                                     `}
                                     onClick={handleLinkClick}
                                     {...linkProps}

@@ -29,7 +29,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   return (
-    <div className="flex items-center space-x-2 w-80 h-10 rounded-xl border border-gray-700 bg-gray-600 p-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500">
+    <div className="flex items-center space-x-2 w-80 h-10 rounded-xl border border-gray-700 bg-gray-800 p-2 shadow-sm focus-within:ring-2 focus-within:ring-sky-500">
       <input
         type="text"
         placeholder={placeholder}
