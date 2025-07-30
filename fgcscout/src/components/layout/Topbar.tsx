@@ -11,7 +11,7 @@ export default function Topbar() {
   };
 
   return (
-    <div className="fixed inset-x-0 w-full px-6 py-4 top-0 h-16 bg-green-800 z-50">
+    <div className="fixed inset-x-0 w-full px-6 py-4 top-0 h-16 bg-emerald-700 z-50">
       <div className="h-full flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10">
         <div className="flex items-center space-x-2 sm:space-x-3">
           <MobileSidebar />
