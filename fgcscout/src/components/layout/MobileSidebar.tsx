@@ -47,7 +47,7 @@ export default function MobileSidebar() {
             </SheetTrigger>
             <SheetContent side="left" className="w-64 bg-gray-950 p-0 border-r-0 [&>button]:hidden">
                 <SheetHeader className="absolute top-0 left-0 right-0 p-4 pt-6 bg-gray-950">
-                    <SheetTitle className="text-xl font-bold text-white text-center">Navigation</SheetTitle>
+                    <SheetTitle className="text-xl font-bold text-white text-center">FGC Scout</SheetTitle>
                 </SheetHeader>
 
                 <div className="flex-1 flex flex-col p-4 space-y-6 overflow-y-auto mt-16">
