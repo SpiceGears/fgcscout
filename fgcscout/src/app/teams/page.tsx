@@ -10,7 +10,7 @@ export default function Teams() {
 
   return (
     <div className="bg-gray-950 min-h-screen w-full flex flex-col p-8">
-      <h1 className="text-3xl font-bold text-gray-50 mb-6">
+      <h1 className="text-3xl font-bold text-gray-50 text-center mb-6">
         <em>FIRST</em> Global Challenge Teams
       </h1>
       <div className="flex-grow flex flex-col">

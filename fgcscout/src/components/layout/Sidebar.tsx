@@ -13,7 +13,7 @@ export default function Sidebar() {
             className="
         fixed left-0 flex h-screen
         overflow-hidden
-        flex-col justify-between bg-gray-900 pt-18 text-gray-50
+        flex-col justify-between bg-gray-800 text-gray-50a
         z-30
         w-70
         2xl:translate-x-0
