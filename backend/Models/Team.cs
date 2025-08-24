@@ -11,5 +11,7 @@ namespace backend.Models
 
         [BsonElement("Country")]
         public string Country { get; set; } = null!;
+
+        [BsonElement("")]
     }
 }
