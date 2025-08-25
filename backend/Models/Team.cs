@@ -6,12 +6,14 @@ namespace backend.Models
     public class Team
     {
         [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = null!;
 
         [BsonElement("Country")]
         public string Country { get; set; } = null!;
 
-        [BsonElement("")]
+        [BsonElement("CountryCode")]
+        public string CountryCode { get; set; } = null!;
+        [BsonElement("Disqualified")]
+        public bool Disqualified { get; set; }
     }
 }
