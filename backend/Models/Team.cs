@@ -8,12 +8,12 @@ namespace backend.Models
         [BsonId]
         public string Id { get; set; } = null!;
 
-        [BsonElement("Country")]
+        [BsonElement("country")]
         public string Country { get; set; } = null!;
 
-        [BsonElement("CountryCode")]
+        [BsonElement("countryCode")]
         public string CountryCode { get; set; } = null!;
-        [BsonElement("Disqualified")]
+        [BsonElement("disqualified")]
         public bool Disqualified { get; set; }
     }
 }
