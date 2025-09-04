@@ -28,4 +28,5 @@ public enum ComponentType
 {
     Number,
     Boolean,
+    String
 }
