@@ -7,14 +7,84 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { Award, CalendarDays, ChevronDown } from "lucide-react";
 import { SEASONS } from "@/constants/Seasons";
 
-export default function Team() {
-  const [selectedSeason, setSelectedSeason] = useState<string>(
-    SEASONS[0].season
-  );
+type Season = (typeof SEASONS)[number]["season"];
+
+function SeasonSelect({
+  value,
+  onChange,
+}: {
+  value: Season;
+  onChange: (s: Season) => void;
+}) {
   const [open, setOpen] = useState(false);
+
+  const selected = useMemo(
+    () => SEASONS.find((s) => s.season === value),
+    [value]
+  );
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        className="
+          inline-flex items-center gap-2 rounded-md border border-gray-700
+          bg-gray-850/60 px-4 py-2 text-sm sm:text-base font-medium text-gray-200
+          shadow-sm backdrop-blur-sm
+          hover:bg-gray-800 hover:text-white hover:border-gray-600
+          focus:outline-none focus:ring-2 focus:ring-indigo-500/40
+          transition
+        "
+      >
+        <span className="truncate max-w-[10rem] sm:max-w-[16rem]">
+          {selected ? selected.label : value}
+        </span>
+        <ChevronDown
+          className={`h-5 w-5 sm:h-6 sm:w-6 opacity-80 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="start"
+        sideOffset={8}
+        className="
+          w-64 rounded-lg border border-gray-700/70 bg-gray-900/95
+          text-gray-200 shadow-xl backdrop-blur-xl
+        "
+      >
+        {SEASONS.map((item) => (
+          <DropdownMenuItem
+            key={item.season}
+            onSelect={(e) => {
+              e.preventDefault();
+              onChange(item.season as Season);
+              setOpen(false);
+            }}
+            className="
+              cursor-pointer text-gray-200
+              focus:bg-gray-800 focus:text-white
+              transition-colors
+            "
+          >
+            <div className="flex flex-col">
+              <span className="font-medium">{item.label}</span>
+              <span className="text-xs text-gray-400">
+                {item.country} {item.season}
+              </span>
+            </div>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export default function Team() {
+  const [selectedSeason, setSelectedSeason] = useState<Season>(SEASONS[0].season);
 
   const selectedLabel = useMemo(() => {
     const found = SEASONS.find((s) => s.season === selectedSeason);
@@ -23,91 +93,59 @@ export default function Team() {
 
   return (
     <div className="bg-gray-950 min-h-screen w-full">
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="absolute left-0 top-8 -translate-x-full pr-4">
-          <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger
-              className="
-                inline-flex items-center gap-2 rounded-md border border-gray-700
-                bg-gray-850/60 px-6 py-3 text-md font-medium text-gray-200
-                shadow-sm backdrop-blur-sm
-                hover:bg-gray-800 hover:text-white hover:border-gray-600
-                focus:outline-none focus:ring-2 focus:ring-indigo-500/40
-                active:translate-y-px transition
-              "
-            >
-              {selectedLabel}
-              <ChevronDown
-                className={`h-6 w-6 opacity-80 transition-transform duration-200 ${
-                  open ? "rotate-180" : "rotate-0"
-                }`}
-              />
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="start"
-              sideOffset={8}
-              className="
-                w-64 rounded-lg border border-gray-700/70 bg-gray-900/95
-                text-gray-200 shadow-xl backdrop-blur-xl
-                data-[state=open]:animate-in data-[state=closed]:animate-out
-                data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0
-                data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95
-                data-[side=bottom]:slide-in-from-top-2
-              "
-            >
-              {SEASONS.map((item) => (
-                <DropdownMenuItem
-                  key={item.season}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    setSelectedSeason(item.season);
-                    setOpen(false);
-                  }}
-                  className="
-                    cursor-pointer text-gray-200
-                    focus:bg-gray-800 focus:text-white
-                    data-[highlighted]:bg-gray-800 data-[highlighted]:text-white
-                    transition-colors
-                  "
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{item.label}</span>
-                    <span className="text-xs text-gray-400">
-                      {item.country} {item.season}
-                    </span>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-50">
+            Team Poland
+          </h1>
+          <div className="flex items-center gap-3">
+            <span className="text-gray-300 text-sm sm:text-base">Season:</span>
+            <SeasonSelect
+              value={selectedSeason}
+              onChange={setSelectedSeason}
+            />
+          </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-50 mb-6">Team Poland</h1>
+        <div className="space-y-4 sm:space-y-6">
+          {/* Stats card */}
+          <div className="bg-gray-900 border border-gray-600 rounded-lg shadow-lg p-4 sm:p-6">
+            <p className="text-lg sm:text-xl font-bold text-gray-100 mb-4">
+              Stats {selectedLabel ? `— ${selectedLabel}` : ""}
+            </p>
 
-        <div className="bg-gray-900 border border-gray-600 rounded-lg shadow-lg p-6">
-          <p className="text-xl font-bold text-gray-100 mb-4">Stats</p>
-
-          <ul className="divide-y divide-gray-700 rounded-lg overflow-hidden bg-gray-900">
-            <li className="flex items-center justify-between gap-4 p-4">
-              <div className="flex items-center gap-3">
+            <ul className="divide-y divide-gray-700 rounded-lg overflow-hidden bg-gray-900">
+              <li className="flex items-center justify-between gap-4 p-4">
                 <span className="text-gray-200">Ranking Score:</span>
-              </div>
-              <span className="font-semibold text-gray-100">94.64</span>
-            </li>
-            <li className="flex items-center justify-between gap-4 p-4">
-              <div className="flex items-center gap-3">
+                <span className="font-semibold text-gray-100">94.64</span>
+              </li>
+              <li className="flex items-center justify-between gap-4 p-4">
                 <span className="text-gray-200">Highest Score:</span>
-              </div>
-              <span className="font-semibold text-gray-100">129</span>
-            </li>
-            <li className="flex items-center justify-between gap-4 p-4">
-              <div className="flex items-center gap-3">
+                <span className="font-semibold text-gray-100">129</span>
+              </li>
+              <li className="flex items-center justify-between gap-4 p-4">
                 <span className="text-gray-200">Matches Played:</span>
-              </div>
-              <span className="font-semibold text-gray-100">12</span>
-            </li>
-          </ul>
+                <span className="font-semibold text-gray-100">12</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Matches card */}
+          <div className="bg-gray-900 border border-gray-600 rounded-lg shadow-lg p-4 sm:p-6">
+            <p className="text-lg sm:text-xl font-bold text-gray-100 mb-4">
+              Matches
+            </p>
+            <div className="flex items-center gap-2 text-gray-300 text-sm mb-3">
+              <CalendarDays className="w-5 h-5"/>
+              <p>29 October - 1 November 2025</p>
+            </div>
+            <div className="flex items-center gap-2 text-gray-300 text-sm mb-3">
+              <Award className="w-5 h-5"/>
+              <p>1st Place</p>
+            </div>
+            <p className="text-gray-300 text-sm ml-7">W-L-T: <b>10-2-0</b></p>
+          </div>
         </div>
       </div>
     </div>

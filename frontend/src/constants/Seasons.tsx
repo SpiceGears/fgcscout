@@ -1,3 +1,3 @@
 export const SEASONS = [
-    { label: "Feeding the future", season: "2024", country: "Greece" },
+    { label: "Eco Equilibrium", season: "2025", country: "Panama" },
 ];
