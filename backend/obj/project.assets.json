@@ -1066,31 +1066,24 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\kulik\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "/Users/michalkulik/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\kulik\\dev\\fgcscout\\backend\\backend.csproj",
+      "projectUniqueName": "/Users/michalkulik/Desktop/dev/fgcscout/backend/backend.csproj",
       "projectName": "FGCScoutAPI",
-      "projectPath": "C:\\Users\\kulik\\dev\\fgcscout\\backend\\backend.csproj",
-      "packagesPath": "C:\\Users\\kulik\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\kulik\\dev\\fgcscout\\backend\\obj\\",
+      "projectPath": "/Users/michalkulik/Desktop/dev/fgcscout/backend/backend.csproj",
+      "packagesPath": "/Users/michalkulik/.nuget/packages/",
+      "outputPath": "/Users/michalkulik/Desktop/dev/fgcscout/backend/obj/",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\kulik\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/Users/michalkulik/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -1109,7 +1102,7 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.200"
+      "SdkAnalysisLevel": "9.0.300"
     },
     "frameworks": {
       "net9.0": {
@@ -1147,7 +1140,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.203/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.301/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
