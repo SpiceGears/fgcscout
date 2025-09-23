@@ -148,7 +148,7 @@ export default function Team() {
               <p>Qualifications</p>
             </div>
             <div className="overflow-x-auto flex justify-center">
-              <table className="table-auto">  
+                <table className="table-auto">  
                 <thead>
                   <tr className="text-left border-b border-gray-700 text-gray-100 font-bold">
                   <th className="p-2">Match</th>
@@ -158,10 +158,10 @@ export default function Team() {
                   </tr>
                 </thead>
                 <tbody className="text-gray-100">
-                  <tr className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors">
+                  <tr onClick={() => window.location.href = `/match/Q-1`} className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors">
                   <td className="p-2 text-blue-500">Q-1</td>
                   <td className="p-2">
-                    <span className="text-red-500">120</span><span className="px-1">-</span><span className="text-blue-500">165</span>
+                  <span className="text-red-500">120</span><span className="px-1">-</span><span className="text-blue-500">165</span>
                   </td>
                   <td className="p-2 bg-red-500/20">Team Japan</td>
                   <td className="p-2 bg-red-500/20">Team USA</td>
@@ -170,10 +170,10 @@ export default function Team() {
                   <td className="p-2 bg-blue-500/20">Team Canada</td>
                   <td className="p-2 bg-blue-500/20">Team Mexico</td>
                   </tr>
-                  <tr className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors">
+                  <tr onClick={() => window.location.href = `/match/Q-2`} className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors">
                   <td className="p-2 text-red-500">Q-2</td>
                   <td className="p-2">
-                    <span className="text-red-500">120</span><span className="px-1">-</span><span className="text-blue-500">165</span>
+                  <span className="text-red-500">120</span><span className="px-1">-</span><span className="text-blue-500">165</span>
                   </td>
                   <td className="p-2 bg-red-500/20">Team Germany</td>
                   <td className="p-2 bg-red-500">Team Poland</td>
@@ -182,10 +182,10 @@ export default function Team() {
                   <td className="p-2 bg-blue-500/20">Team Italy</td>
                   <td className="p-2 bg-blue-500/20">Team Spain</td>
                   </tr>
-                  <tr className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors">
+                  <tr onClick={() => window.location.href = `/match/Q-3`} className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors">
                   <td className="p-2 text-blue-500">Q-3</td>
                   <td className="p-2">
-                    <span className="text-red-500">120</span><span className="px-1">-</span><span className="text-blue-500">165</span>
+                  <span className="text-red-500">120</span><span className="px-1">-</span><span className="text-blue-500">165</span>
                   </td>
                   <td className="p-2 bg-red-500/20">Team Brazil</td>
                   <td className="p-2 bg-red-500/20">Team Argentina</td>
