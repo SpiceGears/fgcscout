@@ -24,7 +24,7 @@ export default function MobileSidebar() {
         { label: "Home", href: "/", icon: Home },
         { label: "Teams", href: "/teams", icon: Users },
         { label: "Matches", href: "/matches", icon: Swords },
-        { label: "Seasons", href: "/seasons", icon: CalendarDays },
+        { label: "Events", href: "/events", icon: CalendarDays },
     ], []);
 
     const otherNavItems = useMemo(() => [
