@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      target: build
+    working_dir: /src
+    command:
+      - dotnet
+      - watch
+      - run
+      - --no-launch-profile
+      - --project
+      - backend.csproj
+      - --
+      - --urls
+      - http://0.0.0.0:80
+    entrypoint: []
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    volumes:
+      - type: bind
+        source: ./backend
+        target: /src
+      - type: volume
+        source: backend_bin
+        target: /src/bin
+      - type: volume
+        source: backend_obj
+        target: /src/obj
+
+  frontend:
+    build:
+      target: development
+    working_dir: /app
+    command:
+      - npm
+      - run
+      - dev
+      - --
+      - --hostname
+      - 0.0.0.0
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - type: bind
+        source: ./frontend
+        target: /app
+      - type: volume
+        source: frontend_node_modules
+        target: /app/node_modules
+      - type: volume
+        source: frontend_next_cache
+        target: /app/.next-fgcscout
+
+volumes:
+  backend_bin:
+  backend_obj:
+  frontend_node_modules:
+  frontend_next_cache:

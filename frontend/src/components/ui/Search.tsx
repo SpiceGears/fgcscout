@@ -1,6 +1,5 @@
 "use client";
 
-import { Search } from "lucide-react";
 import React, { useState } from "react";
 
 interface SearchBarProps {
@@ -18,9 +17,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
     setSearchTerm(event.target.value);
   };
 
-  const handleSearchClick = () => {
-    onSearch(searchTerm);
-  };
 
   const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {

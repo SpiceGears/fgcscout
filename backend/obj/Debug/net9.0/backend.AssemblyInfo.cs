@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FGCScoutAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+65d8c967c0ce2759eff0145b0d903c2e5475f70a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+177268f36e467dffb5a6dc638af74f786bf94a94")]
 [assembly: System.Reflection.AssemblyProductAttribute("FGCScoutAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FGCScoutAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

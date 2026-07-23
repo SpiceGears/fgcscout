@@ -7,7 +7,7 @@ namespace backend.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class TeamsController : ControllerBase
-        {
+{
     private readonly DBService _dbService;
 
     public TeamsController(DBService dbService)

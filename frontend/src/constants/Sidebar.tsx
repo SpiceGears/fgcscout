@@ -1,5 +1,6 @@
-import { Home, Users, CalendarDays, Swords, Info, ScrollText, Code } from "lucide-react";
+import { Home, Users, CalendarDays, Swords, Info, ScrollText, Code, ShieldCheck } from "lucide-react";
 import { FaGithub } from 'react-icons/fa';
+
 
 export const MAIN_NAV_ITEMS = [
     { label: "Home", href: "/", icon: Home },
@@ -9,8 +10,9 @@ export const MAIN_NAV_ITEMS = [
 ];
 
 export const OTHER_NAV_ITEMS = [
+    { label: "Admin", href: "/admin", icon: ShieldCheck },
     { label: "About", href: "/about", icon: Info },
     { label: "Privacy Policy", href: "/privacy", icon: ScrollText },
     { label: "API", href: "/api", icon: Code },
     { label: "Repository", href: "https://github.com/spicegears/fgcscout", icon: FaGithub, isExternal: true },
-] 
+];

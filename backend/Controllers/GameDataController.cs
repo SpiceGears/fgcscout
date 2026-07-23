@@ -17,8 +17,25 @@ public class GameDataController : ControllerBase
         _db = db;
     }
 
+    // GET available game data years
+    [HttpGet("years")]
+    public async Task<ActionResult<List<uint>>> GetYears()
+    {
+        var years = await _db.GetGameDataYearsAsync();
+        return years.OrderByDescending(y => y).ToList();
+    }
+
+    // GET a single game data document by MongoDB ObjectId
+    [HttpGet("match/{id}")]
+    public async Task<ActionResult<object>> GetMatch(string id)
+    {
+        var data = await _db.GetGameDataAsync(id);
+        if (data is null) return NotFound(new { error = "Match not found" });
+        return MapGameDataToDto(data);
+    }
+
     // GET all game data for a season (year) - returns DTOs with CLR-friendly types
-    [HttpGet("{year}")]
+    [HttpGet("{year:int}")]
     public async Task<ActionResult<List<object>>> Get(uint year)
     {
         var list = await _db.GetGameDataAsync(year);

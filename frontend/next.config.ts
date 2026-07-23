@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Keep generated files isolated from stale caches created by other Node runtimes.
+  distDir: ".next-fgcscout",
+  output: "standalone",
 };
 
 export default nextConfig;
