@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, CalendarClock, MapPin, Youtube } from "lucide-react";
 import { formatTeamName, formatTeamSlug } from "@/lib/country";
+import FieldVisualization from "@/components/match/FieldVisualization";
 
 type Participant = {
   station?: number;
@@ -189,6 +190,8 @@ export default function MatchPage() {
                 </tbody>
               </table>
             </div>
+
+            <FieldVisualization details={details} redTeams={redTeams} blueTeams={blueTeams} />
 
             <h2 className="mt-7 text-2xl font-semibold">Detailed Results</h2>
             <div className="mt-3 overflow-hidden rounded-xl border border-gray-700 bg-gray-900">
