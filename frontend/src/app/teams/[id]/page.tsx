@@ -24,7 +24,7 @@ export default function LegacyTeamRoute() {
 
     async function redirectToCountryPage() {
       try {
-        const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "";
         const response = await fetch(`${base}/api/Teams/${encodeURIComponent(teamId)}`);
         if (!response.ok) throw new Error("Team not found.");
         const team = (await response.json()) as Team;

@@ -3,7 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatCountryName, formatTeamName, formatTeamSlug } from "@/lib/country";
-import { TeamMatchSummary } from "@/components/team/TeamMatchSummary";
+import { MatchesTable } from "@/components/match/MatchesTable";
+import { getTeamAwards, type AwardPlacement } from "@/constants/EventContent";
 
 type TeamData = { id: string; country?: string; countryCode?: string };
 type Schema = { year: number; name?: string };
@@ -42,6 +43,12 @@ const getTeamAlliance = (participants: MatchParticipant[], teamId: string) => {
   return participant ? getParticipantAlliance(participant.station) : undefined;
 };
 
+const AWARD_PLACEMENTS: Record<AwardPlacement, { label: string; color: string }> = {
+  gold: { label: "Gold", color: "text-amber-400" },
+  silver: { label: "Silver", color: "text-gray-300" },
+  bronze: { label: "Bronze", color: "text-orange-400" },
+};
+
 export default function TeamPage() {
   const params = useParams();
   const rawSlug = params?.slug;
@@ -54,7 +61,6 @@ export default function TeamPage() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [matches, setMatches] = useState<MatchDatum[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [teamsMap, setTeamsMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!slug) return;
@@ -64,7 +70,7 @@ export default function TeamPage() {
         const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
         const [tres, sres, yres] = await Promise.all([
           fetch(`${base}/api/Teams`),
-          fetch(`${base}/api/GameSchema`),
+          fetch(`${base}/api/Seasons`),
           fetch(`${base}/api/GameData/years`),
         ]);
 
@@ -89,14 +95,14 @@ export default function TeamPage() {
         const years: number[] = [];
         if (yres.ok) {
           const data = (await yres.json()) as number[];
-          const sortedYears = data.sort((a, b) => a - b);
+          const sortedYears = data.sort((a, b) => b - a);
           setAvailableYears(sortedYears);
           years.push(...sortedYears);
         }
 
         if (sres.ok) {
-          const s = (await sres.json()) as Array<{ Year?: number; year?: number; Name?: string; name?: string }>;
-          const mapped = s.map((x) => ({ year: x.Year ?? x.year ?? 0, name: x.Name ?? x.name }));
+          const s = (await sres.json()) as Array<{ year?: number; name?: string }>;
+          const mapped = s.map((x) => ({ year: x.year ?? 0, name: x.name })).sort((a, b) => b.year - a.year);
           setSeasons(mapped);
           if (mapped.length > 0) {
             setSelectedSeason(mapped[0].year);
@@ -115,30 +121,10 @@ export default function TeamPage() {
     load();
   }, [slug]);
 
-    useEffect(() => {
-      async function loadTeams() {
-        try {
-          const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
-          const res = await fetch(`${base}/api/Teams`);
-          if (!res.ok) return;
-          const list = await res.json();
-          const m: Record<string, string> = {};
-          for (const t of list) {
-            const id = String(t.id ?? t.Id ?? "");
-            const label = formatCountryName(t.country, t.countryCode) || id;
-            if (id) m[id] = label;
-          }
-          setTeamsMap(m);
-        } catch (e) {
-          console.warn("Failed to load teams map", e);
-        }
-      }
-      loadTeams();
-    }, []);
-
   useEffect(() => {
     if (!selectedSeason || !teamId) return;
 
+    let active = true;
     async function loadMatches() {
       try {
         const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
@@ -150,19 +136,19 @@ export default function TeamPage() {
           if (!parts) return false;
           return parts.some((p) => String(p?.teamKey) === String(teamId));
         });
-        setMatches(filtered);
+        if (active) setMatches(filtered);
       } catch (e) {
         console.warn(e);
       }
     }
 
-    loadMatches();
+    void loadMatches();
+    const timer = window.setInterval(() => void loadMatches(), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [selectedSeason, teamId]);
-
-  const selectedLabel = useMemo(() => {
-    const found = seasons.find((s) => s.year === selectedSeason);
-    return found ? found.name ?? found.year : selectedSeason;
-  }, [selectedSeason, seasons]);
 
   const inferredCountry = useMemo(() => {
     if (team?.country || team?.countryCode) return { country: team?.country, countryCode: team?.countryCode };
@@ -212,10 +198,15 @@ export default function TeamPage() {
     return { wins, losses, ties };
   }, [matches, teamId]);
 
+  const awards = useMemo(
+    () => getTeamAwards(selectedSeason, slug),
+    [selectedSeason, slug]
+  );
+
   if (error) {
     return (
-      <div className="bg-gray-950 min-h-screen w-full text-white px-4 py-8">
-        <div className="mx-auto max-w-4xl bg-gray-900 border border-gray-700 rounded-3xl shadow-xl p-8">
+      <div className="page-shell">
+        <div className="panel mx-auto max-w-4xl p-8">
           <h1 className="text-2xl font-bold mb-4">Team not found</h1>
           <p className="text-gray-300 mb-6">{error}</p>
           <button
@@ -231,15 +222,18 @@ export default function TeamPage() {
   }
 
   return (
-    <div className="bg-gray-950 min-h-screen w-full">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-50">
-            {formatTeamName(inferredCountry.country, inferredCountry.countryCode)}
-          </h1>
+    <main className="page-shell">
+      <div className="page-container max-w-6xl">
+        <header className="mb-6 flex flex-col gap-5 border-b border-slate-800 pb-7 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="eyebrow">Team profile</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+              {formatTeamName(inferredCountry.country, inferredCountry.countryCode)}
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
-            <span className="text-gray-300 text-sm sm:text-base">Season:</span>
-            <select className="bg-gray-800 text-gray-200 px-3 py-2 rounded" value={selectedSeason ?? undefined} onChange={(e) => setSelectedSeason(Number(e.target.value))}>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Season</span>
+            <select className="control px-3 py-2 text-sm" value={selectedSeason ?? undefined} onChange={(e) => setSelectedSeason(Number(e.target.value))}>
               {seasons.length > 0 ? (
                 seasons.map((s) => (
                   <option key={s.year} value={s.year}>{s.name ?? s.year}</option>
@@ -251,60 +245,73 @@ export default function TeamPage() {
               )}
             </select>
           </div>
-        </div>
+        </header>
 
         <div className="space-y-4 sm:space-y-6">
-          <div className="bg-gray-900 border border-gray-600 rounded-lg shadow-lg p-4 sm:p-6">
-            <p className="text-lg sm:text-xl font-bold text-gray-100 mb-4">Stats {selectedLabel ? `— ${selectedLabel}` : ""}</p>
-            <ul className="divide-y divide-gray-700 rounded-lg overflow-hidden bg-gray-900">
-              <li className="flex items-center justify-between gap-4 p-4">
-                <span className="text-gray-200">Country</span>
-                <span className="font-semibold text-gray-100">{formatCountryName(inferredCountry.country, inferredCountry.countryCode)}</span>
+          <section className="panel overflow-hidden">
+            <div className="border-b border-slate-800 px-5 py-4">
+              <p className="subtle-label">Season snapshot</p>
+            </div>
+            <ul className="grid divide-y divide-slate-800 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <li className="p-5">
+                <span className="subtle-label">Country</span>
+                <span className="mt-2 block font-semibold text-slate-100">{formatCountryName(inferredCountry.country, inferredCountry.countryCode)}</span>
               </li>
-              <li className="flex items-center justify-between gap-4 p-4">
-                <span className="text-gray-200">Country code</span>
-                <span className="font-semibold text-gray-100">{(inferredCountry.countryCode ?? inferredCountry.country ?? "Unknown").toString().toUpperCase()}</span>
+              <li className="p-5">
+                <span className="subtle-label">Matches played</span>
+                <span className="mt-2 block font-mono text-2xl font-semibold text-white">{matches.length}</span>
               </li>
-              <li className="flex items-center justify-between gap-4 p-4">
-                <span className="text-gray-200">Matches played</span>
-                <span className="font-semibold text-gray-100">{matches.length}</span>
-              </li>
-              <li className="flex items-center justify-between gap-4 p-4">
-                <span className="text-gray-200">Record</span>
-                <span className="font-semibold text-gray-100">{record.wins}-{record.losses}-{record.ties}</span>
+              <li className="p-5">
+                <span className="subtle-label">Record</span>
+                <span className="mt-2 block font-mono text-2xl font-semibold text-white">{record.wins}-{record.losses}-{record.ties}</span>
               </li>
             </ul>
-          </div>
+          </section>
 
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+          {awards.length > 0 && (
+            <section className="panel overflow-hidden">
+              <div className="border-b border-gray-800 px-5 py-4 sm:px-6">
+                <h2 className="text-lg font-semibold text-white">Awards</h2>
+              </div>
+
+              <div className="divide-y divide-gray-800">
+                {awards.map((teamAward) => {
+                  const placement = AWARD_PLACEMENTS[teamAward.placement];
+                  return (
+                    <article
+                      key={`${teamAward.name}-${teamAward.placement}`}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_7rem] sm:px-6"
+                    >
+                      <h3 className="min-w-0 text-sm font-medium leading-5 text-gray-200 sm:text-base">
+                        {teamAward.name}
+                      </h3>
+                      <div className="text-right">
+                        <span className={`text-xs font-semibold uppercase tracking-[0.12em] ${placement.color}`}>
+                          {placement.label}
+                        </span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <section>
+            <div className="mb-3">
               <div>
                 <h2 className="text-2xl font-bold text-white">Matches</h2>
                 <p className="text-sm text-gray-400 mt-1">{matches.length} played matches</p>
               </div>
-
-              <div className="bg-gray-800 px-4 py-2 rounded-xl border border-gray-700">
-                <span className="text-sm text-gray-300">Record</span>
-                <p className="text-lg font-bold text-white">{record.wins}-{record.losses}-{record.ties}</p>
-              </div>
             </div>
 
-            <div>
-              {teamId && matches.map((match) => (
-                <TeamMatchSummary
-                  key={match.id}
-                  match={match}
-                  teamId={teamId}
-                  teamsMap={teamsMap}
-                />
-              ))}
-              {matches.length === 0 && (
-                <p className="p-8 text-center text-gray-400">No matches found for this team in the selected season.</p>
-              )}
-            </div>
-          </div>
+            {teamId && matches.length > 0 && <MatchesTable matches={matches} currentTeamId={teamId} />}
+            {matches.length === 0 && (
+              <div className="panel p-8 text-center text-gray-400">No matches found for this team in the selected season.</div>
+            )}
+          </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

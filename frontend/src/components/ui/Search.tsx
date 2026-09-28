@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Search } from "lucide-react";
 
 interface SearchBarProps {
   onSearch: (searchTerm: string) => void;
@@ -18,21 +19,23 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
 
-  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
-      onSearch(searchTerm);
+      onSearch(searchTerm.trim());
     }
   };
 
   return (
-    <div className="flex items-center space-x-2 w-80 h-10 rounded-xl border border-gray-700 bg-gray-800 p-2 shadow-sm focus-within:ring-2 focus-within:ring-sky-500">
+    <div className="control flex h-9 w-44 items-center gap-2 px-3 sm:w-72">
+      <Search className="h-4 w-4 shrink-0 text-slate-500" />
       <input
         type="text"
         placeholder={placeholder}
         value={searchTerm}
         onChange={handleInputChange}
-        onKeyPress={handleKeyPress}
-        className="flex-grow appearance-none border-none p-1 text-gray-50 outline-none focus:ring-0"
+        onKeyDown={handleKeyDown}
+        aria-label={placeholder}
+        className="min-w-0 flex-1 appearance-none border-none bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
       />
     </div>
   );

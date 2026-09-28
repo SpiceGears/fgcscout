@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Award, BarChart3, CalendarDays, ExternalLink, MapPin, Play } from "lucide-react";
 import { formatTeamName, formatTeamSlug } from "@/lib/country";
-import { AWARDS_2025, EVENT_META, MEDIA_LINKS } from "@/constants/EventContent";
+import { AWARDS_2025, EVENT_META, getAwardTeamSlug, MEDIA_LINKS, parseAwardTeams } from "@/constants/EventContent";
 
 type Participant = {
   station?: number;
@@ -39,28 +39,21 @@ type Ranking = {
   ties: number;
   pointsFor: number;
   pointsAgainst: number;
+  rankingScore: number;
+  highestPoints: number;
+  protectionPoints: number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const TABS = ["Results", "Rankings", "Awards", "Teams", "Stats", "Media"] as const;
 type Tab = (typeof TABS)[number];
-
-const AWARD_TEAM_SLUGS: Record<string, string> = {
-  kazakhstan: "kaz", aruba: "aru", lebanon: "lbn", venezuela: "ven", mexico: "mex", panama: "pan",
-  cameroon: "cmr", serbia: "srb", lithuania: "ltu", malta: "mlt", kenya: "ken", bolivia: "bol",
-  jamaica: "jam", china: "chn", "united arab emirates": "uae", iran: "iri", colombia: "col",
-  spain: "esp", greece: "gre", moldova: "mda", indonesia: "ina", canada: "can", peru: "per",
-  nigeria: "ngr", madagascar: "mad", liberia: "lbr", vietnam: "vie", "burkina faso": "bfa",
-  philippines: "phi", zimbabwe: "zim",
-};
 
 function AwardTeamLinks({ value }: { value?: string }) {
   if (!value) return <span className="text-gray-600">—</span>;
   return (
     <>
-      {value.split(" · ").map((entry, index) => {
-        const country = entry.replace(/^Team\s+/i, "").trim();
-        const slug = AWARD_TEAM_SLUGS[country.toLowerCase()] ?? formatTeamSlug(country);
+      {parseAwardTeams(value).map((country, index) => {
+        const slug = getAwardTeamSlug(country);
         return (
           <span key={`${country}-${index}`}>
             {index > 0 && <span className="mx-1.5 text-gray-600">·</span>}
@@ -155,11 +148,26 @@ function ResultsTable({ matches }: { matches: EventMatch[] }) {
   );
 }
 
-function buildRankings(matches: EventMatch[]) {
+function getParkingPoints(match: EventMatch, station: number) {
+  const side = station < 20 ? "red" : "blue";
+  const robot = ["", "One", "Two", "Three"][station % 10];
+  const value = robot ? match.data.details?.[`${side}Robot${robot}Parking`] : undefined;
+  return typeof value === "number" ? value : 0;
+}
+
+function buildRankings(matches: EventMatch[], year: number | null) {
   const rankings = new Map<string, Ranking>();
+  const hasNamedRankingStage = matches.some((match) => /(qualification|ranking match)/i.test(match.data.name ?? ""));
   for (const match of matches) {
     if (match.data.played === false) continue;
-    if (match.data.name && !/(qualification|ranking match)/i.test(match.data.name)) continue;
+    if (year === 2025) {
+      if (!/ranking match/i.test(match.data.name ?? "")) continue;
+    } else if (hasNamedRankingStage && match.data.name && !/(qualification|ranking match)/i.test(match.data.name)) {
+      continue;
+    } else if (!hasNamedRankingStage && /(final|round robin|playoff)/i.test(match.data.name ?? "")) {
+      continue;
+    }
+    if (typeof match.data.redScore !== "number" || typeof match.data.blueScore !== "number") continue;
     const redScore = match.data.redScore ?? 0;
     const blueScore = match.data.blueScore ?? 0;
     for (const participant of match.data.participants ?? []) {
@@ -176,6 +184,9 @@ function buildRankings(matches: EventMatch[]) {
         ties: 0,
         pointsFor: 0,
         pointsAgainst: 0,
+        rankingScore: 0,
+        highestPoints: 0,
+        protectionPoints: 0,
       };
       const side = getAlliance(participant.station);
       if (!side) continue;
@@ -184,12 +195,41 @@ function buildRankings(matches: EventMatch[]) {
       row.played += 1;
       row.pointsFor += ownScore;
       row.pointsAgainst += opponentScore;
+      row.highestPoints = Math.max(row.highestPoints, ownScore);
+      row.protectionPoints += getParkingPoints(match, participant.station!);
       if (ownScore === opponentScore) row.ties += 1;
       else if (ownScore > opponentScore) row.wins += 1;
       else row.losses += 1;
       rankings.set(key, row);
     }
   }
+
+  if (year === 2025) {
+    for (const row of rankings.values()) {
+      const teamScores: number[] = [];
+      for (const match of matches) {
+        if (match.data.played === false || !/ranking match/i.test(match.data.name ?? "")) continue;
+        const participant = match.data.participants?.find((entry) =>
+          String(entry.teamKey ?? entry.countryCode ?? entry.country ?? "") === row.key
+        );
+        const side = getAlliance(participant?.station);
+        if (!side) continue;
+        const score = side === "red" ? match.data.redScore : match.data.blueScore;
+        if (typeof score === "number") teamScores.push(score);
+      }
+      const countedScores = teamScores.sort((a, b) => b - a).slice(0, 11);
+      row.rankingScore = countedScores.length
+        ? countedScores.reduce((sum, score) => sum + score, 0) / countedScores.length
+        : 0;
+    }
+    return [...rankings.values()].sort((a, b) =>
+      b.rankingScore - a.rankingScore ||
+      b.highestPoints - a.highestPoints ||
+      b.protectionPoints - a.protectionPoints ||
+      a.country.localeCompare(b.country)
+    );
+  }
+
   return [...rankings.values()].sort((a, b) => {
     const scoreA = a.wins * 3 + a.ties;
     const scoreB = b.wins * 3 + b.ties;
@@ -217,14 +257,26 @@ export default function EventsPage() {
 
   useEffect(() => {
     if (year === null) return;
-    setLoading(true);
-    fetch(`${API_URL}/api/GameData/${year}`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : [])
-      .then((data: EventMatch[]) => setMatches(data))
-      .finally(() => setLoading(false));
+    let active = true;
+    async function loadMatches(initial: boolean) {
+      if (initial) setLoading(true);
+      try {
+        const response = await fetch(`${API_URL}/api/GameData/${year}`, { cache: "no-store" });
+        const data = response.ok ? await response.json() as EventMatch[] : [];
+        if (active) setMatches(data);
+      } finally {
+        if (active && initial) setLoading(false);
+      }
+    }
+    void loadMatches(true);
+    const timer = window.setInterval(() => void loadMatches(false), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [year]);
 
-  const rankings = useMemo(() => buildRankings(matches), [matches]);
+  const rankings = useMemo(() => buildRankings(matches, year), [matches, year]);
   const teams = useMemo(() => {
     const directory = new Map<string, { key: string; name: string; slug: string }>();
     matches.forEach((match) => match.data.participants?.forEach((participant) => {
@@ -251,46 +303,57 @@ export default function EventsPage() {
   const meta = year ? EVENT_META[year] : undefined;
 
   return (
-    <main className="min-h-screen bg-gray-950 px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <main className="page-shell">
+      <div className="page-container">
+        <header className="flex flex-col gap-6 border-b border-slate-800 pb-7 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-400">{meta?.theme ?? "FIRST Global Challenge"}</p>
-            <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{meta?.title ?? (year ? `Season ${year}` : "Event")}</h1>
-            <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-400">
+            <p className="eyebrow">{meta?.theme ?? "FIRST Global Challenge"}</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">{meta?.title ?? (year ? `Season ${year}` : "Event")}</h1>
+            <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
               {meta && <><span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" />{meta.dates}</span><span className="flex items-center gap-2"><MapPin className="h-4 w-4" />{meta.location}</span></>}
             </div>
           </div>
-          <label className="flex min-w-48 flex-col gap-2 text-sm text-gray-400">Season
-            <select value={year ?? ""} onChange={(event) => setYear(Number(event.target.value))} className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 font-semibold text-white">
+          <label className="flex min-w-48 flex-col gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Season
+            <select value={year ?? ""} onChange={(event) => setYear(Number(event.target.value))} className="control px-4 py-3 text-sm font-semibold normal-case tracking-normal">
               {years.map((availableYear) => <option key={availableYear} value={availableYear}>{availableYear}</option>)}
             </select>
           </label>
         </header>
 
-        <nav className="mt-8 flex gap-1 overflow-x-auto rounded-2xl border border-gray-800 bg-gray-900 p-1.5">
-          {TABS.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition ${tab === item ? "bg-sky-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}>{item}</button>)}
+        <nav className="mt-6 flex gap-1 overflow-x-auto rounded-xl border border-gray-800 bg-gray-900 p-1">
+          {TABS.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition ${tab === item ? "bg-sky-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}>{item}</button>)}
         </nav>
 
         <section className="mt-6">
-          {loading ? <div className="h-96 animate-pulse rounded-3xl bg-gray-900" /> : null}
+          {loading ? <div className="h-96 animate-pulse rounded-xl border border-gray-800 bg-gray-900" /> : null}
           {!loading && tab === "Results" && <ResultsTable matches={matches} />}
 
           {!loading && tab === "Rankings" && (
-            <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-gray-900">
-              <div className="border-b border-gray-800 p-5"><h2 className="text-xl font-bold">Team rankings</h2><p className="mt-1 text-sm text-gray-500">Calculated from played match results.</p></div>
-              <table className="w-full min-w-[700px] text-left"><thead className="bg-gray-800 text-sm text-gray-300"><tr><th className="px-4 py-3">Rank</th><th className="px-4 py-3">Team</th><th className="px-4 py-3 text-center">Played</th><th className="px-4 py-3 text-center">W-L-T</th><th className="px-4 py-3 text-center">Ranking score</th><th className="px-4 py-3 text-center">Point diff.</th></tr></thead><tbody>{rankings.map((ranking, index) => <tr key={ranking.key} className="border-t border-gray-800"><td className="px-4 py-3 text-xl font-black text-sky-400">{index + 1}</td><td className="px-4 py-3 font-semibold"><Link href={`/team/${formatTeamSlug(ranking.countryRaw, ranking.countryCode, ranking.key)}`} className="transition hover:text-sky-300 hover:underline">{ranking.country}</Link></td><td className="px-4 py-3 text-center">{ranking.played}</td><td className="px-4 py-3 text-center">{ranking.wins}-{ranking.losses}-{ranking.ties}</td><td className="px-4 py-3 text-center font-bold">{ranking.wins * 3 + ranking.ties}</td><td className="px-4 py-3 text-center">{ranking.pointsFor - ranking.pointsAgainst}</td></tr>)}</tbody></table>
+            <div className="panel overflow-x-auto">
+              <div className="flex flex-col gap-3 border-b border-gray-800 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div><h2 className="text-xl font-bold">Team rankings</h2><p className="mt-1 text-sm text-gray-500">{year === 2025 ? "Ranking Score is the average of each team's best 11 scores from 12 Ranking Matches." : "Calculated from played match results."}</p></div>
+                {year === 2025 && <a href="https://first.global/archive/fgc-2025/#rankings" target="_blank" rel="noreferrer" className="flex shrink-0 items-center gap-2 text-sm font-semibold text-sky-400 transition hover:text-sky-300">Official standings <ExternalLink className="h-4 w-4" /></a>}
+              </div>
+              <table className="w-full min-w-[700px] text-left">
+                <thead className="bg-slate-800/60 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Rank</th><th className="px-4 py-3">Team</th><th className="px-4 py-3 text-center">Played</th>
+                    {year === 2025 ? <><th className="px-4 py-3 text-center">Ranking Score</th><th className="px-4 py-3 text-center">Highest Points</th><th className="px-4 py-3 text-center">Protection Points</th></> : <><th className="px-4 py-3 text-center">W-L-T</th><th className="px-4 py-3 text-center">Ranking score</th><th className="px-4 py-3 text-center">Point diff.</th></>}
+                  </tr>
+                </thead>
+                <tbody>{rankings.map((ranking, index) => <tr key={ranking.key} className="border-t border-gray-800 transition hover:bg-gray-800/60"><td className="px-4 py-3 font-mono text-sm font-bold text-sky-400">{String(index + 1).padStart(2, "0")}</td><td className="px-4 py-3 font-semibold"><Link href={`/team/${formatTeamSlug(ranking.countryRaw, ranking.countryCode, ranking.key)}`} className="transition hover:text-sky-300">{ranking.country}</Link></td><td className="px-4 py-3 text-center">{ranking.played}</td>{year === 2025 ? <><td className="px-4 py-3 text-center font-mono font-bold">{ranking.rankingScore.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td className="px-4 py-3 text-center">{ranking.highestPoints}</td><td className="px-4 py-3 text-center">{ranking.protectionPoints.toLocaleString("en-US", { maximumFractionDigits: 3 })}</td></> : <><td className="px-4 py-3 text-center">{ranking.wins}-{ranking.losses}-{ranking.ties}</td><td className="px-4 py-3 text-center font-bold">{ranking.wins * 3 + ranking.ties}</td><td className="px-4 py-3 text-center">{ranking.pointsFor - ranking.pointsAgainst}</td></>}</tr>)}</tbody>
+              </table>
             </div>
           )}
 
           {!loading && tab === "Awards" && (
             <div>
-              <div className="mb-5 flex items-center justify-between"><div><h2 className="text-2xl font-bold">Official 2025 awards</h2><p className="text-sm text-gray-500">Winners from the Eco Equilibrium challenge in Panama.</p></div>{year === 2025 && <a href="https://first.global/press-releases/a-beautiful-week-in-panama-the-2025-first-global-challenge-concludes-awards-announced/" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-sky-400">Official source <ExternalLink className="h-4 w-4" /></a>}</div>
-              {year === 2025 ? <div className="grid gap-4 md:grid-cols-2">{AWARDS_2025.map((award) => <article key={award.name} className="rounded-2xl border border-gray-800 bg-gray-900 p-5"><div className="flex gap-3"><Award className="mt-0.5 text-amber-400" /><h3 className="font-bold">{award.name}</h3></div><div className="mt-4 space-y-2 text-sm"><p><span className="mr-2">🥇</span><AwardTeamLinks value={award.gold} /></p><p><span className="mr-2">🥈</span><AwardTeamLinks value={award.silver} /></p><p><span className="mr-2">🥉</span><AwardTeamLinks value={award.bronze} /></p></div></article>)}</div> : <p className="rounded-2xl bg-gray-900 p-8 text-gray-400">Switch to season 2025 to see the official awards.</p>}
+              <div className="mb-5 flex items-center justify-between"><div><h2 className="text-2xl font-bold">{year ? `${year} awards` : "Awards"}</h2><p className="text-sm text-gray-500">{year === 2025 ? "Official winners from the Eco Equilibrium challenge in Panama." : "Awards will appear after they are added for this season."}</p></div>{year === 2025 && <a href="https://first.global/press-releases/a-beautiful-week-in-panama-the-2025-first-global-challenge-concludes-awards-announced/" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-sky-400">Official source <ExternalLink className="h-4 w-4" /></a>}</div>
+              {year === 2025 ? <div className="grid gap-3 md:grid-cols-2">{AWARDS_2025.map((award) => <article key={award.name} className="panel p-5"><div className="flex gap-3"><Award className="mt-0.5 h-5 w-5 text-amber-400" /><h3 className="font-semibold">{award.name}</h3></div><div className="mt-4 space-y-2 text-sm text-slate-400"><p><span className="mr-2">🥇</span><AwardTeamLinks value={award.gold} /></p><p><span className="mr-2">🥈</span><AwardTeamLinks value={award.silver} /></p><p><span className="mr-2">🥉</span><AwardTeamLinks value={award.bronze} /></p></div></article>)}</div> : <p className="panel p-8 text-slate-500">No awards have been added for this season yet.</p>}
             </div>
           )}
 
-          {!loading && tab === "Teams" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{teams.map((team) => <Link key={team.key} href={`/team/${team.slug}`} className="rounded-2xl border border-gray-800 bg-gray-900 p-4 font-semibold transition hover:-translate-y-0.5 hover:border-sky-700 hover:text-sky-300">{team.name}</Link>)}</div>}
+          {!loading && tab === "Teams" && <div className="grid gap-px overflow-hidden rounded-xl border border-gray-800 bg-gray-800 sm:grid-cols-2 lg:grid-cols-4">{teams.map((team) => <Link key={team.key} href={`/team/${team.slug}`} className="bg-gray-900 p-4 font-medium text-gray-300 transition hover:bg-gray-800 hover:text-sky-300">{team.name}</Link>)}</div>}
 
           {!loading && tab === "Stats" && (
             <div className="space-y-6">

@@ -1,1 +1,10 @@
 .env
+
+# Generated build output and local diagnostics
+**/bin/
+**/obj/
+**/.next/
+**/.next-*/
+*.log
+reservoir_status.txt
+backups/

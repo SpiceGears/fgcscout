@@ -22,7 +22,8 @@ public class GameDataController : ControllerBase
     public async Task<ActionResult<List<uint>>> GetYears()
     {
         var years = await _db.GetGameDataYearsAsync();
-        return years.OrderByDescending(y => y).ToList();
+        var configuredYears = (await _db.GetSeasonConfigurationsAsync()).Select(item => item.Year);
+        return years.Concat(configuredYears).Distinct().OrderByDescending(y => y).ToList();
     }
 
     // GET a single game data document by MongoDB ObjectId

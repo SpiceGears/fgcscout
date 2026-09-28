@@ -10,16 +10,27 @@ public class DBService
     private readonly IMongoCollection<Team> _teams;
     private readonly IMongoCollection<GameSchema> _schemas;
     private readonly IMongoCollection<GameData> _gameData;
+    private readonly IMongoCollection<SeasonConfiguration> _seasonConfigurations;
+    private readonly IMongoDatabase _database;
 
     public DBService(IOptions<DatabaseSettings> databaseSettings)
     {
-        var mongoClient = new MongoClient(databaseSettings.Value.ConnectionString);
-        var mongoDatabase = mongoClient.GetDatabase(databaseSettings.Value.DatabaseName);
+        var settings = databaseSettings.Value;
+        var connection = new MongoUrlBuilder(settings.ConnectionString);
+        if (!string.IsNullOrWhiteSpace(settings.Username)) connection.Username = settings.Username;
+        if (!string.IsNullOrWhiteSpace(settings.Password)) connection.Password = settings.Password;
+        if (!string.IsNullOrWhiteSpace(settings.AuthenticationSource)) connection.AuthenticationSource = settings.AuthenticationSource;
+        var mongoClient = new MongoClient(connection.ToMongoUrl());
+        _database = mongoClient.GetDatabase(settings.DatabaseName);
 
-        _teams = mongoDatabase.GetCollection<Team>("Teams");
-        _schemas = mongoDatabase.GetCollection<GameSchema>("GameSchemas");
-        _gameData = mongoDatabase.GetCollection<GameData>("GameData");
+        _teams = _database.GetCollection<Team>("Teams");
+        _schemas = _database.GetCollection<GameSchema>("GameSchemas");
+        _gameData = _database.GetCollection<GameData>("GameData");
+        _seasonConfigurations = _database.GetCollection<SeasonConfiguration>("SeasonConfigurations");
     }
+
+    public async Task PingAsync(CancellationToken cancellationToken = default) =>
+        await _database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
 
     // ---------------- TEAM METHODS ----------------
     public async Task<List<Team>> GetTeamsAsync() =>
@@ -85,6 +96,87 @@ public class DBService
 
         return deleted;
     }
+
+    public sealed record GameDataUpsertResult(int Inserted, int Updated);
+
+    public async Task<GameDataUpsertResult> UpsertGameDataSeasonAsync(uint year, IReadOnlyCollection<GameData> data)
+    {
+        var existing = await GetGameDataAsync(year);
+        var existingByKey = existing
+            .Select(item => (Key: GetMatchSourceKey(item.Data), Item: item))
+            .Where(item => item.Key is not null)
+            .GroupBy(item => item.Key!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Item, StringComparer.Ordinal);
+
+        var writes = new List<WriteModel<GameData>>();
+        var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+        var inserted = 0;
+        var updated = 0;
+        var now = DateTime.UtcNow;
+
+        foreach (var incoming in data)
+        {
+            var key = GetMatchSourceKey(incoming.Data);
+            if (key is null || !seenKeys.Add(key)) continue;
+
+            incoming.Year = year;
+            incoming.UpdatedAt = now;
+            if (existingByKey.TryGetValue(key, out var stored))
+            {
+                if (stored.Data.TryGetValue("videoUrl", out var videoUrl) && !incoming.Data.Contains("videoUrl"))
+                    incoming.Data["videoUrl"] = videoUrl;
+
+                incoming.Id = stored.Id;
+                incoming.CreatedAt = stored.CreatedAt;
+                writes.Add(new ReplaceOneModel<GameData>(
+                    Builders<GameData>.Filter.Eq(item => item.Id, stored.Id), incoming));
+                updated++;
+            }
+            else
+            {
+                incoming.Id = ObjectId.GenerateNewId();
+                incoming.CreatedAt = now;
+                writes.Add(new InsertOneModel<GameData>(incoming));
+                inserted++;
+            }
+        }
+
+        if (writes.Count > 0)
+            await _gameData.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = false });
+
+        return new GameDataUpsertResult(inserted, updated);
+    }
+
+    private static string? GetMatchSourceKey(BsonDocument data)
+    {
+        static string Read(BsonDocument document, string name) =>
+            document.TryGetValue(name, out var value) && !value.IsBsonNull ? value.ToString() ?? string.Empty : string.Empty;
+
+        var eventKey = Read(data, "eventKey");
+        var tournamentKey = Read(data, "tournamentKey");
+        var matchId = Read(data, "id");
+        if (!string.IsNullOrWhiteSpace(matchId))
+            return $"{eventKey}|{tournamentKey}|{matchId}";
+
+        var name = Read(data, "name");
+        var scheduledTime = Read(data, "scheduledTime");
+        return string.IsNullOrWhiteSpace(name) ? null : $"{eventKey}|{tournamentKey}|{name}|{scheduledTime}";
+    }
+
+    public async Task<List<SeasonConfiguration>> GetSeasonConfigurationsAsync() =>
+        await _seasonConfigurations.Find(_ => true).SortByDescending(item => item.Year).ToListAsync();
+
+    public async Task<SeasonConfiguration?> GetSeasonConfigurationAsync(uint year) =>
+        await _seasonConfigurations.Find(item => item.Year == year).FirstOrDefaultAsync();
+
+    public async Task UpsertSeasonConfigurationAsync(SeasonConfiguration configuration) =>
+        await _seasonConfigurations.ReplaceOneAsync(
+            item => item.Year == configuration.Year,
+            configuration,
+            new ReplaceOptions { IsUpsert = true });
+
+    public async Task RemoveSeasonConfigurationAsync(uint year) =>
+        await _seasonConfigurations.DeleteOneAsync(item => item.Year == year);
 
     public async Task CreateGameDataAsync(GameData data) =>
         await _gameData.InsertOneAsync(data);

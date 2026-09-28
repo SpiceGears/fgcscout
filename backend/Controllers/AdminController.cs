@@ -10,23 +10,39 @@ namespace backend.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly DBService _db;
+    private readonly SeasonImportService _seasonImportService;
+    private readonly SeasonSyncService _seasonSyncService;
 
-    public AdminController(DBService db)
+    public AdminController(DBService db, SeasonImportService seasonImportService, SeasonSyncService seasonSyncService)
     {
         _db = db;
+        _seasonImportService = seasonImportService;
+        _seasonSyncService = seasonSyncService;
     }
 
     [HttpGet("seasons")]
     public async Task<IActionResult> GetSeasons()
     {
-        var years = (await _db.GetGameDataYearsAsync()).OrderByDescending(year => year);
+        var configurations = (await _db.GetSeasonConfigurationsAsync()).ToDictionary(item => item.Year);
+        var years = (await _db.GetGameDataYearsAsync())
+            .Concat(configurations.Keys)
+            .Distinct()
+            .OrderByDescending(year => year);
         var seasons = new List<object>();
         foreach (var year in years)
         {
+            configurations.TryGetValue(year, out var configuration);
             seasons.Add(new
             {
                 year,
-                matchCount = await _db.CountGameDataAsync(year)
+                name = configuration?.Name ?? $"FIRST Global Challenge {year}",
+                matchCount = await _db.CountGameDataAsync(year),
+                sourceUrl = configuration?.SourceUrl ?? "https://results.first.global/",
+                syncEnabled = configuration?.SyncEnabled ?? false,
+                syncIntervalMinutes = configuration?.SyncIntervalMinutes ?? 5,
+                lastSyncAt = configuration?.LastSyncAt,
+                lastSyncError = configuration?.LastSyncError,
+                lastSyncMatchCount = configuration?.LastSyncMatchCount
             });
         }
 
@@ -37,10 +53,77 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> DeleteSeason(uint year)
     {
         var deletedMatches = await _db.RemoveGameDataSeasonAsync(year);
-        if (deletedMatches == 0)
+        var configuration = await _db.GetSeasonConfigurationAsync(year);
+        if (deletedMatches == 0 && configuration is null)
             return NotFound(new { error = $"Season {year} was not found." });
 
+        await _db.RemoveSeasonConfigurationAsync(year);
+
         return Ok(new { year, deletedMatches });
+    }
+
+    public sealed record SeasonConfigurationRequest(
+        string? Name,
+        string? SourceUrl,
+        bool SyncEnabled,
+        int SyncIntervalMinutes);
+
+    [HttpPut("seasons/{year:int}")]
+    public async Task<IActionResult> ConfigureSeason(uint year, [FromBody] SeasonConfigurationRequest request)
+    {
+        if (year < 2017 || year > 2100) return BadRequest(new { error = "Enter a valid FIRST Global season year." });
+        if ((request.Name?.Length ?? 0) > 120) return BadRequest(new { error = "Season name cannot exceed 120 characters." });
+        var sourceUrl = string.IsNullOrWhiteSpace(request.SourceUrl) ? "https://results.first.global/" : request.SourceUrl.Trim();
+        if (sourceUrl.Length > 2048 || !Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri))
+            return BadRequest(new { error = "The sync source must be an absolute HTTPS URL." });
+        try
+        {
+            _seasonSyncService.ValidateSourceUri(uri);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+
+        var existing = await _db.GetSeasonConfigurationAsync(year);
+        var configuration = new SeasonConfiguration
+        {
+            Year = year,
+            Name = string.IsNullOrWhiteSpace(request.Name) ? $"FIRST Global Challenge {year}" : request.Name.Trim(),
+            SourceUrl = sourceUrl,
+            SyncEnabled = request.SyncEnabled,
+            SyncIntervalMinutes = Math.Clamp(request.SyncIntervalMinutes, 1, 1440),
+            LastSyncAt = existing?.LastSyncAt,
+            LastSyncError = existing?.LastSyncError,
+            LastSyncMatchCount = existing?.LastSyncMatchCount
+        };
+        await _db.UpsertSeasonConfigurationAsync(configuration);
+        return Ok(configuration);
+    }
+
+    [HttpPost("seasons/{year:int}/sync")]
+    public async Task<IActionResult> SyncSeason(uint year, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _seasonSyncService.SyncAsync(year, cancellationToken);
+            return Ok(new
+            {
+                year = result.Year,
+                matches = result.MatchCount,
+                insertedMatches = result.InsertedMatches,
+                updatedMatches = result.UpdatedMatches,
+                upsertedTeams = result.UpsertedTeams
+            });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { error = exception.Message });
+        }
+        catch (HttpRequestException exception)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = $"The upstream results source failed: {exception.Message}" });
+        }
     }
 
     public sealed record MatchVideoRequest(string? VideoUrl);
@@ -51,6 +134,7 @@ public class AdminController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.VideoUrl))
         {
             if (!Uri.TryCreate(request.VideoUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme != Uri.UriSchemeHttps ||
                 !(uri.Host.Equals("youtube.com", StringComparison.OrdinalIgnoreCase) ||
                   uri.Host.EndsWith(".youtube.com", StringComparison.OrdinalIgnoreCase) ||
                   uri.Host.Equals("youtu.be", StringComparison.OrdinalIgnoreCase) ||
@@ -68,6 +152,7 @@ public class AdminController : ControllerBase
     // POST api/admin/importMatches
     // Accepts either { "matches": [ ... ] } or an array of match objects
     [HttpPost("importMatches")]
+    [RequestSizeLimit(25 * 1024 * 1024)]
     public async Task<IActionResult> ImportMatches([FromBody] System.Text.Json.JsonElement payload)
     {
         var matchesEl = payload;
@@ -111,6 +196,7 @@ public class AdminController : ControllerBase
     // POST api/admin/importTeams
     // Accepts either an array of team objects or { matches: [...] } (extracts participants)
     [HttpPost("importTeams")]
+    [RequestSizeLimit(25 * 1024 * 1024)]
     public async Task<IActionResult> ImportTeams([FromBody] System.Text.Json.JsonElement payload)
     {
         var teams = new Dictionary<string, Team>();
@@ -148,87 +234,28 @@ public class AdminController : ControllerBase
     // POST api/admin/importSeason
     // Imports a full season file: matches -> GameData, participants -> Teams
     [HttpPost("importSeason")]
+    [RequestSizeLimit(25 * 1024 * 1024)]
     public async Task<IActionResult> ImportSeason(
         [FromBody] System.Text.Json.JsonElement payload,
         [FromQuery] bool replaceExisting = true)
     {
-        System.Text.Json.JsonElement matchesEl = default;
-        if (payload.ValueKind == System.Text.Json.JsonValueKind.Array)
-            matchesEl = payload;
-        else if (payload.ValueKind == System.Text.Json.JsonValueKind.Object && payload.TryGetProperty("matches", out var m))
-            matchesEl = m;
-        else
-            return BadRequest(new { error = "Expected an array of matches or an object with 'matches'." });
-
-        if (matchesEl.ValueKind != System.Text.Json.JsonValueKind.Array)
-            return BadRequest(new { error = "The 'matches' property must be an array." });
-
-        var matchElements = matchesEl.EnumerateArray().ToList();
-        if (matchElements.Count == 0)
-            return BadRequest(new { error = "The season file does not contain any matches." });
-
-        var detectedYears = matchElements
-            .Select(TryGetYear)
-            .Where(year => year.HasValue)
-            .Select(year => year!.Value)
-            .Distinct()
-            .ToList();
-
-        if (detectedYears.Count == 0)
-            return BadRequest(new { error = "Could not determine the season year. Include a four-digit year in eventKey." });
-        if (detectedYears.Count > 1)
-            return BadRequest(new { error = "One JSON file must describe exactly one season.", years = detectedYears });
-
-        var detectedYear = detectedYears[0];
-        var gameDataList = new List<GameData>();
-        var teamsDict = new Dictionary<string, Team>();
-
-        foreach (var item in matchElements)
+        try
         {
-            if (item.TryGetProperty("participants", out var parts) && parts.ValueKind == System.Text.Json.JsonValueKind.Array)
+            var result = await _seasonImportService.ImportAsync(payload, replaceExisting);
+            return Ok(new
             {
-                foreach (var p in parts.EnumerateArray()) AddTeamFromElement(p, teamsDict);
-            }
-
-            gameDataList.Add(new GameData
-            {
-                Year = detectedYear,
-                TeamId = null,
-                Data = JsonElementToBsonDocument(item),
-                CreatedAt = System.DateTime.UtcNow
+                year = result.Year,
+                playedMatches = result.MatchCount,
+                upsertedTeams = result.UpsertedTeams,
+                replacedMatches = result.ReplacedMatches,
+                insertedMatches = result.InsertedMatches,
+                updatedMatches = result.UpdatedMatches
             });
         }
-
-        var existingMatches = await _db.CountGameDataAsync(detectedYear);
-        if (existingMatches > 0 && !replaceExisting)
-            return Conflict(new
-            {
-                error = $"Season {detectedYear} already exists.",
-                year = detectedYear,
-                existingMatches
-            });
-
-        long replacedMatches;
-        if (replaceExisting)
+        catch (InvalidOperationException exception)
         {
-            replacedMatches = await _db.ReplaceGameDataSeasonAsync(detectedYear, gameDataList);
+            return BadRequest(new { error = exception.Message });
         }
-        else
-        {
-            await _db.CreateGameDataManyAsync(gameDataList);
-            replacedMatches = 0;
-        }
-
-        if (teamsDict.Count > 0)
-            await _db.UpsertTeamsAsync(teamsDict.Values.ToList());
-
-        return Ok(new
-        {
-            year = detectedYear,
-            playedMatches = gameDataList.Count,
-            upsertedTeams = teamsDict.Count,
-            replacedMatches
-        });
     }
 
     private static uint? TryGetYear(System.Text.Json.JsonElement item)

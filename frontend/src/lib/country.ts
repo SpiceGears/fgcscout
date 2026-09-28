@@ -1,7 +1,23 @@
+const COUNTRY_NAME_OVERRIDES: Record<string, string> = {
+  CG: "Congo",
+  CD: "Democratic Republic of the Congo",
+  PS: "Palestine",
+  HK: "Hong Kong",
+  HPE: "Hope",
+  MM: "Myanmar",
+};
+
 export function formatCountryName(country?: string, countryCode?: string) {
   const normalizedCode = countryCode?.trim().toUpperCase();
+  const normalizedCountry = country?.trim().toUpperCase();
   const regionCode = normalizedCode?.length === 2 ? normalizedCode : undefined;
   const fallback = country?.trim();
+  const override = (normalizedCode && COUNTRY_NAME_OVERRIDES[normalizedCode])
+    || (normalizedCountry && COUNTRY_NAME_OVERRIDES[normalizedCountry]);
+
+  if (override) {
+    return override;
+  }
 
   if (regionCode && typeof Intl !== "undefined" && "DisplayNames" in Intl) {
     try {

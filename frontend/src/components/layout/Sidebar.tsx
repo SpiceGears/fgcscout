@@ -7,68 +7,60 @@ import { MAIN_NAV_ITEMS, OTHER_NAV_ITEMS } from "@/constants/Sidebar";
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const isCurrent = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
     return (
-        <aside
-            className="
-        fixed left-0 flex h-screen
-        overflow-hidden
-        flex-col justify-between bg-gray-800 text-gray-50a
-        z-30
-        w-70
-        2xl:translate-x-0
-        transform transition-transform duration-300 ease-in-out
-        -translate-x-full
-      "
-        >
-            <div className="flex-1 flex flex-col p-4 space-y-6">
-                <nav className="flex-1 flex-col space-y-3">
+        <aside className="fixed bottom-0 left-0 top-14 z-30 hidden w-60 flex-col border-r border-gray-700 bg-gray-800 lg:flex">
+            <div className="flex flex-1 flex-col px-3 py-5">
+                <p className="subtle-label px-3 pb-2">Explore</p>
+                <nav className="space-y-1">
                     {MAIN_NAV_ITEMS.map((item) => {
-                        const isActive = pathname === item.href;
+                        const isActive = isCurrent(item.href);
                         return (
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className={`
-                                    flex items-center gap-3 p-2 rounded
-                                    hover:bg-sky-700
-                                    ${isActive ? "bg-sky-800 font-bold" : ""}
-                                `}
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${
+                                  isActive
+                                    ? "border-sky-700 bg-sky-800 font-semibold text-white"
+                                    : "border-transparent text-gray-300 hover:bg-gray-700 hover:text-white"
+                                }`}
                             >
                                 {React.createElement(item.icon, {
-                                    className: "h-5 w-5 text-gray-300",
+                                    className: `h-4 w-4 ${isActive ? "text-sky-300" : "text-gray-400"}`,
                                 })}
-                                <span className="text-white">{item.label}</span>
-                            </Link>
-                        );
-                    })}
-                    <hr className="my-6 border-t border-gray-700" />
-                    {OTHER_NAV_ITEMS.map((item) => {
-                        const isExternal = item.isExternal;
-                        const isActive = !isExternal && pathname === item.href;
-                        const linkProps = isExternal
-                            ? { target: "_blank", rel: "noopener noreferrer" }
-                            : {};
-
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`
-                                    flex items-center gap-3 p-2 rounded
-                                    hover:bg-sky-700
-                                    ${isActive ? "bg-sky-800 font-bold" : ""}
-                                `}
-                                {...linkProps}
-                            >
-                                {React.createElement(item.icon, {
-                                    className: "h-5 w-5 text-gray-300",
-                                })}
-                                <span className="text-white">{item.label}</span>
+                                <span>{item.label}</span>
                             </Link>
                         );
                     })}
                 </nav>
+                <div className="my-5 h-px bg-slate-800" />
+                <p className="subtle-label px-3 pb-2">Project</p>
+                <nav className="space-y-1">
+                    {OTHER_NAV_ITEMS.map((item) => {
+                        const isActive = isCurrent(item.href);
+
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${
+                                  isActive
+                                    ? "border-sky-700 bg-sky-800 font-semibold text-white"
+                                    : "border-transparent text-gray-400 hover:bg-gray-700 hover:text-white"
+                                }`}
+                            >
+                                {React.createElement(item.icon, {
+                                    className: `h-4 w-4 ${isActive ? "text-sky-300" : "text-gray-400"}`,
+                                })}
+                                <span>{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
+                <div className="mt-auto px-3 pt-8">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-700">Independent data project</p>
+                </div>
             </div>
         </aside>
     );

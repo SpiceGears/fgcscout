@@ -8,17 +8,17 @@ public class GameSchema
     public uint Year { get; set; }
 
     [BsonElement("name")]
-    public string Name { get; set; } //season name ex. FIRST Global Panama City 2025
+    public string Name { get; set; } = string.Empty; //season name ex. FIRST Global Panama City 2025
 
 
-    public List<SchemaComponent> schema { get; set; }
+    public List<SchemaComponent> schema { get; set; } = [];
 }
 
 
 public class SchemaComponent
 {
     public ComponentType Type { get; set; }
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     public bool Nullable { get; set; }
 }
 

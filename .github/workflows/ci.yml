@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Audit production frontend dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore backend
+        working-directory: backend
+        run: dotnet restore backend.csproj
+
+      - name: Build backend
+        working-directory: backend
+        run: dotnet build backend.csproj --no-restore --configuration Release
+
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: dotnet list backend.csproj package --vulnerable --include-transitive
+
+      - name: Start production stack
+        env:
+          MONGO_ROOT_PASSWORD: ci-root-password-not-for-production
+          MONGO_APP_PASSWORD: ci-app-password-not-for-production
+          FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
+          CADDY_SITE_ADDRESS: http://localhost
+          FGCSCOUT_FRONTEND_ORIGIN: http://localhost
+        run: docker compose -f docker-compose.prod.yml up --build --detach --wait
+
+      - name: Run smoke tests
+        env:
+          FGCSCOUT_BASE_URL: http://localhost
+          FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
+        run: node scripts/smoke-test.mjs
+
+      - name: Show service logs after failure
+        if: failure()
+        run: docker compose -f docker-compose.prod.yml logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: docker compose -f docker-compose.prod.yml down --volumes

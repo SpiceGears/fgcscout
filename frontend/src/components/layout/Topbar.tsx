@@ -1,31 +1,28 @@
 "use client"
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SearchBar from "../ui/Search";
 import MobileSidebar from "./MobileSidebar";
 
 
 export default function Topbar() {
+  const router = useRouter();
   const handleSearch = (searchTerm: string) => {
-    console.log("Searching for:", searchTerm);
+    if (searchTerm) router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
   };
 
   return (
-    <div className="fixed inset-x-0 w-full px-6 py-4 top-0 h-16 bg-emerald-700 z-50">
-      <div className="h-full flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-10">
-        <div className="flex items-center space-x-2 sm:space-x-3">
+    <header className="fixed inset-x-0 top-0 z-50 h-14 border-b border-emerald-800 bg-emerald-700">
+      <div className="flex h-full items-center justify-between gap-3 px-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <MobileSidebar />
-          <Link
-            href="/"
-            className="truncate text-lg sm:text-xl font-bold text-white pb-1"
-          >
+          <Link href="/" className="text-base font-bold tracking-wide text-white sm:text-lg">
             FGC Scout
           </Link>
         </div>
-        <div className="flex items-center space-x-2 sm:space-x-4">
-          <SearchBar onSearch={handleSearch} />
-        </div>
+        <SearchBar onSearch={handleSearch} placeholder="Find a team or match…" />
       </div>
-    </div>
+    </header>
   );
 }

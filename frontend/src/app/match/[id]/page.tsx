@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CalendarClock, MapPin, Youtube } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, ExternalLink, Link2, MapPin, Pencil, Play, X, Youtube } from "lucide-react";
 import { formatTeamName, formatTeamSlug } from "@/lib/country";
 import FieldVisualization from "@/components/match/FieldVisualization";
+import GenericMatchDetails from "@/components/match/GenericMatchDetails";
 
 type Participant = {
   station?: number;
@@ -41,7 +42,7 @@ type MatchDatum = {
   };
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function alliance(station?: number) {
   if (station && station >= 11 && station <= 13) return "red";
@@ -78,7 +79,7 @@ function toYouTubeEmbed(url?: string) {
     if (parsed.hostname === "youtu.be" || parsed.hostname === "www.youtu.be") videoId = parsed.pathname.slice(1);
     else if (parsed.pathname.startsWith("/shorts/") || parsed.pathname.startsWith("/embed/")) videoId = parsed.pathname.split("/")[2] ?? "";
     else videoId = parsed.searchParams.get("v") ?? "";
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
   } catch {
     return null;
   }
@@ -106,30 +107,117 @@ export default function MatchPage() {
   const [match, setMatch] = useState<MatchDatum | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editingVideo, setEditingVideo] = useState(false);
+  const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [adminKey, setAdminKey] = useState("");
+  const [hasStoredAdminKey, setHasStoredAdminKey] = useState(false);
+  const [videoSaving, setVideoSaving] = useState(false);
+  const [videoNotice, setVideoNotice] = useState("");
+  const [videoEnabled, setVideoEnabled] = useState(false);
+
+  useEffect(() => {
+    const storedKey = sessionStorage.getItem("fgcscout.adminKey") ?? "";
+    if (!storedKey) return;
+
+    async function verifyAdminKey() {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/seasons`, {
+          cache: "no-store",
+          headers: { "X-Admin-Key": storedKey },
+        });
+        if (!response.ok) throw new Error("Stored admin key is no longer valid.");
+        setAdminKey(storedKey);
+        setHasStoredAdminKey(true);
+      } catch {
+        sessionStorage.removeItem("fgcscout.adminKey");
+        setAdminKey("");
+        setHasStoredAdminKey(false);
+      }
+    }
+
+    void verifyAdminKey();
+  }, []);
 
   useEffect(() => {
     if (!matchId) return;
-    async function loadMatch() {
-      setLoading(true);
+    let active = true;
+    async function loadMatch(initial: boolean) {
+      if (initial) setLoading(true);
       try {
         const response = await fetch(`${API_URL}/api/GameData/match/${matchId}`, { cache: "no-store" });
         if (!response.ok) throw new Error(response.status === 404 ? "Match not found." : "Could not load match.");
-        setMatch((await response.json()) as MatchDatum);
+        const loadedMatch = (await response.json()) as MatchDatum;
+        if (!active) return;
+        setMatch(loadedMatch);
+        if (initial) {
+          setVideoUrlInput(loadedMatch.data?.videoUrl ?? "");
+          setVideoEnabled(false);
+        }
+        setError("");
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "Could not load match.");
+        if (active && initial) setError(reason instanceof Error ? reason.message : "Could not load match.");
       } finally {
-        setLoading(false);
+        if (active && initial) setLoading(false);
       }
     }
-    loadMatch();
+    void loadMatch(true);
+    const timer = window.setInterval(() => void loadMatch(false), 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [matchId]);
+
+  const saveVideo = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!matchId || !adminKey.trim()) {
+      setVideoNotice("Enter the admin key.");
+      return;
+    }
+
+    setVideoSaving(true);
+    setVideoNotice("");
+    try {
+      const response = await fetch(`${API_URL}/api/admin/matches/${matchId}/video`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Key": adminKey.trim(),
+        },
+        body: JSON.stringify({ videoUrl: videoUrlInput.trim() || null }),
+      });
+      const payload = await response.json() as { error?: string; videoUrl?: string | null };
+      if (!response.ok) {
+        if (response.status === 401) {
+          sessionStorage.removeItem("fgcscout.adminKey");
+          setHasStoredAdminKey(false);
+          setEditingVideo(false);
+        }
+        throw new Error(payload.error ?? "Could not save the video.");
+      }
+
+      sessionStorage.setItem("fgcscout.adminKey", adminKey.trim());
+      setHasStoredAdminKey(true);
+      setMatch((current) => current ? {
+        ...current,
+        data: { ...current.data, videoUrl: payload.videoUrl ?? undefined },
+      } : current);
+      setVideoEnabled(false);
+      setEditingVideo(false);
+      setVideoNotice(payload.videoUrl ? "Video saved." : "Video removed.");
+    } catch (reason) {
+      setVideoNotice(reason instanceof Error ? reason.message : "Could not save the video.");
+    } finally {
+      setVideoSaving(false);
+    }
+  };
 
   const details = match?.data?.details;
   const redTeams = match?.data?.participants?.filter((team) => alliance(team.station) === "red") ?? [];
   const blueTeams = match?.data?.participants?.filter((team) => alliance(team.station) === "blue") ?? [];
 
-  if (loading) return <main className="min-h-screen bg-gray-950 p-8"><div className="mx-auto h-96 max-w-6xl animate-pulse rounded-2xl bg-gray-900" /></main>;
-  if (error || !match) return <main className="min-h-screen bg-gray-950 p-8 text-white"><div className="mx-auto max-w-3xl rounded-2xl border border-red-800 bg-red-950/40 p-8"><h1 className="text-2xl font-bold">Unable to open match</h1><p className="mt-3 text-red-200">{error || "Match not found."}</p><Link href="/events" className="mt-6 inline-flex items-center gap-2 text-sky-400"><ArrowLeft className="h-4 w-4" />Back to event</Link></div></main>;
+  if (loading) return <main className="page-shell"><div className="panel mx-auto h-96 max-w-6xl animate-pulse" /></main>;
+  if (error || !match) return <main className="page-shell"><div className="mx-auto max-w-3xl rounded-xl border border-red-900 bg-red-950/30 p-8"><h1 className="text-2xl font-semibold">Unable to open match</h1><p className="mt-3 text-red-200">{error || "Match not found."}</p><Link href="/events" className="mt-6 inline-flex items-center gap-2 text-sky-400"><ArrowLeft className="h-4 w-4" />Back to event</Link></div></main>;
 
   const data = match.data ?? {};
   const title = data.name ?? `Match ${data.id ?? matchId}`;
@@ -154,22 +242,29 @@ export default function MatchPage() {
   const blueProtectedScore = sharedBasePoints * blueProtectionMultiplier;
   const redRobotProtection = [1, 2, 3].map((robot) => detailNumber(details, `redRobot${["", "One", "Two", "Three"][robot]}Parking`));
   const blueRobotProtection = [1, 2, 3].map((robot) => detailNumber(details, `blueRobot${["", "One", "Two", "Three"][robot]}Parking`));
+  const isEcoEquilibrium = Boolean(details && (
+    "biodiversityUnitsCenterEcosystem" in details ||
+    "barriersInRedMitigator" in details ||
+    "redProtectionMultiplier" in details
+  ));
 
   return (
-    <main className="min-h-screen bg-gray-950 px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <Link href="/events" className="inline-flex items-center gap-2 text-sm text-gray-400 transition hover:text-sky-300"><ArrowLeft className="h-4 w-4" />Back to event</Link>
+    <main className="page-shell">
+      <div className="page-container">
+        <Link href="/events" className="inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-sky-300"><ArrowLeft className="h-4 w-4" />Back to event</Link>
 
-        <header className="mt-5 border-b border-gray-800 pb-5">
+        <header className="mt-5 border-b border-slate-800 pb-6">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="text-3xl font-semibold sm:text-4xl">{title}</h1>
-            <Link href="/events" className="text-xl font-medium text-sky-400 transition hover:text-sky-300 hover:underline">{eventName}</Link>
+            <h1 className="text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">{title}</h1>
+            <Link href="/events" className="text-lg font-medium text-sky-400 transition hover:text-sky-300">{eventName}</Link>
           </div>
           <div className="mt-3 flex flex-wrap gap-5 text-sm text-gray-500">
             <span className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />{formatDate(data.scheduledTime)}</span>
             <span className="flex items-center gap-2"><MapPin className="h-4 w-4" />Field {data.field ?? "—"}</span>
           </div>
         </header>
+
+        {isEcoEquilibrium && <FieldVisualization details={details} redTeams={redTeams} blueTeams={blueTeams} />}
 
         <div className="mt-7 grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(430px,0.95fr)]">
           <div>
@@ -191,9 +286,7 @@ export default function MatchPage() {
               </table>
             </div>
 
-            <FieldVisualization details={details} redTeams={redTeams} blueTeams={blueTeams} />
-
-            <h2 className="mt-7 text-2xl font-semibold">Detailed Results</h2>
+            {isEcoEquilibrium ? <><h2 className="mt-7 text-2xl font-semibold">Detailed Results</h2>
             <div className="mt-3 overflow-hidden rounded-xl border border-gray-700 bg-gray-900">
               <div className="border-b border-gray-700 bg-emerald-950/45 px-5 py-3 text-center font-bold text-emerald-300">Global Alliance scoring</div>
               <table className="w-full border-collapse text-sm">
@@ -241,20 +334,66 @@ export default function MatchPage() {
                 </tbody>
               </table>
               <p className="border-t border-gray-700 bg-gray-950 px-4 py-3 text-center text-xs text-gray-500">Match Score = (Barrier Points + Biodiversity Points × Distribution Factor) × Protection Multiplier + Coopertition Bonus. Fractional scores round up.</p>
-            </div>
+            </div></> : <GenericMatchDetails details={details} />}
           </div>
 
           <aside className="xl:sticky xl:top-6">
-            <h2 className="flex items-center gap-2 text-2xl font-semibold"><Youtube className="text-red-500" />Video</h2>
-            {videoEmbed ? (
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold"><Youtube className="text-red-500" />Video</h2>
+              {hasStoredAdminKey && (
+                <button
+                  onClick={() => {
+                    setVideoUrlInput(data.videoUrl ?? "");
+                    setVideoNotice("");
+                    setEditingVideo((current) => !current);
+                  }}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-gray-400 transition hover:text-white"
+                >
+                  {editingVideo ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                  {editingVideo ? "Cancel" : videoEmbed ? "Edit video" : "Add video"}
+                </button>
+              )}
+            </div>
+            {videoEmbed ? videoEnabled ? (
               <div className="mt-3 overflow-hidden rounded-xl border border-gray-700 bg-black shadow-2xl">
-                <iframe src={videoEmbed} title={`${title} video`} className="aspect-video w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+                <iframe src={videoEmbed} title={`${title} video`} className="aspect-video w-full" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
+              </div>
+            ) : (
+              <div className="mt-3 flex aspect-video items-center justify-center rounded-xl border border-gray-700 bg-gray-900 px-6 text-center">
+                <div className="max-w-sm">
+                  <Youtube className="mx-auto h-12 w-12 text-red-500" />
+                  <p className="mt-3 font-semibold text-gray-200">Load video from YouTube</p>
+                  <p className="mt-2 text-xs leading-5 text-gray-500">YouTube is not contacted until you choose to load the player. Loading it shares technical data such as your IP address with Google.</p>
+                  <button type="button" onClick={() => setVideoEnabled(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500">
+                    <Play className="h-4 w-4 fill-current" />Load video
+                  </button>
+                  {data.videoUrl && <a href={data.videoUrl} target="_blank" rel="noreferrer" className="ml-3 mt-4 inline-flex items-center gap-1.5 text-sm text-sky-400 hover:underline"><ExternalLink className="h-4 w-4" />Open on YouTube</a>}
+                </div>
               </div>
             ) : (
               <div className="mt-3 flex aspect-video items-center justify-center rounded-xl border border-dashed border-gray-700 bg-gray-900 text-center">
-                <div><Youtube className="mx-auto h-12 w-12 text-gray-700" /><p className="mt-3 font-semibold text-gray-400">No video assigned</p><p className="mt-1 text-sm text-gray-600">Add a YouTube URL for this match in Admin.</p></div>
+                <div><Youtube className="mx-auto h-12 w-12 text-gray-700" /><p className="mt-3 font-semibold text-gray-400">No video available</p></div>
               </div>
             )}
+
+            {editingVideo && hasStoredAdminKey && (
+              <form onSubmit={saveVideo} className="mt-3 space-y-3 rounded-xl border border-gray-700 bg-gray-900 p-4">
+                <label className="block text-xs font-medium uppercase tracking-wider text-gray-500">YouTube URL
+                  <div className="relative mt-2">
+                    <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-600" />
+                    <input value={videoUrlInput} onChange={(event) => setVideoUrlInput(event.target.value)} placeholder="https://youtu.be/…" className="control w-full py-2.5 pl-10 pr-3 text-sm" autoFocus />
+                  </div>
+                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <p className={`text-xs ${videoNotice.toLowerCase().includes("saved") || videoNotice.toLowerCase().includes("removed") ? "text-emerald-400" : "text-red-300"}`}>{videoNotice}</p>
+                  <button disabled={videoSaving || !adminKey.trim()} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-40">
+                    <Check className="h-4 w-4" />{videoSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+                {data.videoUrl && <p className="text-xs text-gray-600">Clear the URL and save to remove the recording.</p>}
+              </form>
+            )}
+            {!editingVideo && videoNotice && <p className="mt-2 text-xs text-emerald-400">{videoNotice}</p>}
           </aside>
         </div>
       </div>

@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import { formatTeamName, formatTeamSlug } from "@/lib/country";
 
 type Participant = {
@@ -18,567 +15,135 @@ type FieldVisualizationProps = {
   blueTeams: Participant[];
 };
 
-type EcosystemId = "red" | "center" | "blue";
-
-type Selection =
-  | {
-      kind: "ecosystem";
-      id: EcosystemId;
-    }
-  | {
-      kind: "robot";
-      alliance: "red" | "blue";
-      index: number;
-    };
-
+const ROBOT_SUFFIXES = ["One", "Two", "Three"];
 const LEVELS = new Map([
-  [0, { level: 0, label: "Field surface" }],
-  [0.125, { level: 1, label: "Level 1" }],
-  [0.25, { level: 2, label: "Level 2" }],
-  [0.375, { level: 3, label: "Level 3" }],
-  [0.5, { level: 4, label: "Level 4" }],
+  [0, "L0"],
+  [0.125, "L1"],
+  [0.25, "L2"],
+  [0.375, "L3"],
+  [0.5, "L4"],
 ]);
 
-function numberValue(
-  details: Record<string, unknown> | undefined,
-  key: string,
-) {
+function numberValue(details: Record<string, unknown> | undefined, key: string) {
   const value = details?.[key];
-
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : 0;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function shortTeamLabel(team?: Participant) {
-  const country = team?.country?.trim();
-
-  if (country && country.length <= 4) {
-    return country.toUpperCase();
-  }
-
-  return team?.countryCode?.toUpperCase() ?? "—";
+function displayValue(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function fullTeamName(team?: Participant) {
-  if (!team) {
-    return "Unknown team";
-  }
-
-  return formatTeamName(team.country, team.countryCode);
-}
-
-function protectionInfo(value: number) {
+function Ecosystem({
+  className,
+  label,
+  units,
+  approximate,
+}: {
+  className: string;
+  label: string;
+  units: number;
+  approximate: number;
+}) {
   return (
-    LEVELS.get(value) ?? {
-      level: 0,
-      label: `Recorded: ${value}`,
-    }
+    <div className={`absolute z-20 flex aspect-square w-[15%] items-center justify-center border-2 border-gray-700 bg-gray-800 text-center text-white shadow-sm ${className}`}>
+      <div className="min-w-0 px-1">
+        <span className="block truncate text-[clamp(7px,1vw,12px)] font-bold uppercase tracking-wide text-gray-300">{label}</span>
+        <strong className="block font-mono text-[clamp(17px,2.5vw,32px)] leading-none">{displayValue(units)}</strong>
+        <span className="block text-[clamp(7px,0.85vw,11px)] text-gray-300">units · approx. {displayValue(approximate)}</span>
+      </div>
+    </div>
   );
 }
 
-export default function FieldVisualization({
+function AllianceStation({
+  alliance,
+  teams,
   details,
-  redTeams,
-  blueTeams,
-}: FieldVisualizationProps) {
-  const [selection, setSelection] = useState<Selection>({
-    kind: "ecosystem",
-    id: "center",
-  });
-
-  const ecosystems = useMemo(
-    () => [
-      {
-        id: "red" as const,
-        label: "Red-side Ecosystem",
-        units: numberValue(
-          details,
-          "biodiversityUnitsRedSideEcosystem",
-        ),
-        approximate: numberValue(
-          details,
-          "approximateBiodiversityRedSideEcosystem",
-        ),
-        x: 325,
-        y: 445,
-        points:
-          "270,414 325,380 382,413 380,475 316,505 270,455",
-      },
-      {
-        id: "center" as const,
-        label: "Center Ecosystem",
-        units: numberValue(
-          details,
-          "biodiversityUnitsCenterEcosystem",
-        ),
-        approximate: numberValue(
-          details,
-          "approximateBiodiversityCenterEcosystem",
-        ),
-        x: 450,
-        y: 225,
-        points: "400,180 500,180 500,270 400,270",
-      },
-      {
-        id: "blue" as const,
-        label: "Blue-side Ecosystem",
-        units: numberValue(
-          details,
-          "biodiversityUnitsBlueSideEcosystem",
-        ),
-        approximate: numberValue(
-          details,
-          "approximateBiodiversityBlueSideEcosystem",
-        ),
-        x: 575,
-        y: 445,
-        points:
-          "518,413 575,380 630,414 630,455 584,505 520,475",
-      },
-    ],
-    [details],
-  );
-
-  const robots = useMemo(() => {
-    const suffixes = ["One", "Two", "Three"];
-
-    return [
-      ...redTeams.slice(0, 3).map((team, index) => {
-        const increment = numberValue(
-          details,
-          `redRobot${suffixes[index]}Parking`,
-        );
-
-        return {
-          alliance: "red" as const,
-          team,
-          index,
-          increment,
-        };
-      }),
-
-      ...blueTeams.slice(0, 3).map((team, index) => {
-        const increment = numberValue(
-          details,
-          `blueRobot${suffixes[index]}Parking`,
-        );
-
-        return {
-          alliance: "blue" as const,
-          team,
-          index,
-          increment,
-        };
-      }),
-    ];
-  }, [blueTeams, details, redTeams]);
-
-  const selectedEcosystem =
-    selection.kind === "ecosystem"
-      ? ecosystems.find(
-          (ecosystem) => ecosystem.id === selection.id,
-        )
-      : undefined;
-
-  const selectedRobot =
-    selection.kind === "robot"
-      ? robots.find(
-          (robot) =>
-            robot.alliance === selection.alliance &&
-            robot.index === selection.index,
-        )
-      : undefined;
+}: {
+  alliance: "red" | "blue";
+  teams: Participant[];
+  details?: Record<string, unknown>;
+}) {
+  const isRed = alliance === "red";
+  const multiplier = numberValue(details, `${alliance}ProtectionMultiplier`) || 1;
+  const orderedTeams = [...teams].sort((left, right) => (left.station ?? 0) - (right.station ?? 0));
 
   return (
-    <section className="mt-7 overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-xl">
-      <div className="border-b border-gray-800 px-5 py-4">
-        <h2 className="text-xl font-semibold">
-          Interactive Field Map
-        </h2>
+    <div className={`absolute bottom-[8%] z-30 w-[23%] overflow-hidden border-2 text-white ${isRed ? "left-[2%] border-red-700 bg-red-950/95" : "right-[2%] border-blue-700 bg-blue-950/95"}`}>
+      <div className={`flex items-center justify-between px-[5%] py-[3%] ${isRed ? "bg-red-700" : "bg-blue-700"}`}>
+        <span className="text-[clamp(7px,0.9vw,11px)] font-bold uppercase">{alliance} station</span>
+        <strong className="font-mono text-[clamp(8px,1.1vw,13px)]">{displayValue(multiplier)}×</strong>
+      </div>
+      {ROBOT_SUFFIXES.map((suffix, index) => {
+        const team = orderedTeams[index];
+        const increment = numberValue(details, `${alliance}Robot${suffix}Parking`);
+        const level = LEVELS.get(increment) ?? displayValue(increment);
+        const id = String(team?.teamKey ?? team?.id ?? "");
+        return (
+          <div key={suffix} className="flex min-w-0 items-center justify-between gap-1 border-t border-white/15 px-[5%] py-[2.5%]">
+            {team ? (
+              <Link href={`/team/${formatTeamSlug(team.country, team.countryCode, id)}`} title={formatTeamName(team.country, team.countryCode)} className="min-w-0 truncate text-[clamp(7px,1.1vw,13px)] font-semibold hover:underline">
+                {formatTeamName(team.country, team.countryCode).replace(/^Team\s+/i, "")}
+              </Link>
+            ) : <span className="text-[clamp(7px,1.1vw,13px)] text-white/40">Robot {index + 1}</span>}
+            <span className="shrink-0 font-mono text-[clamp(8px,1.1vw,13px)] font-bold">{level}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-        <p className="mt-1 text-sm text-gray-500">
-          Select an ecosystem or robot to inspect its match data.
-        </p>
+export default function FieldVisualization({ details, redTeams, blueTeams }: FieldVisualizationProps) {
+  const barriersRed = numberValue(details, "barriersInRedMitigator");
+  const barriersBlue = numberValue(details, "barriersInBlueMitigator");
+  const biodiversityRed = numberValue(details, "biodiversityUnitsRedSideEcosystem");
+  const biodiversityCenter = numberValue(details, "biodiversityUnitsCenterEcosystem");
+  const biodiversityBlue = numberValue(details, "biodiversityUnitsBlueSideEcosystem");
+  const totalBiodiversity = biodiversityRed + biodiversityCenter + biodiversityBlue;
+  const distributionFactor = numberValue(details, "biodiversityDistributionFactor");
+  const distributed = numberValue(details, "biodiversityDistributed") || totalBiodiversity * distributionFactor;
+  const coopertition = numberValue(details, "coopertition");
+
+  return (
+    <section className="mx-auto mt-7 max-w-4xl overflow-hidden rounded-xl border border-gray-700 bg-gray-900">
+      <div className="border-b border-gray-700 px-4 py-3 sm:px-5">
+        <h2 className="text-lg font-semibold text-white">Field</h2>
+        <p className="mt-0.5 text-xs text-gray-500">Eco Equilibrium · top view</p>
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_15rem]">
-        <div className="min-w-0 bg-white p-3 sm:p-5">
-          <svg
-            viewBox="0 0 900 620"
-            className="h-auto w-full"
-            role="img"
-            aria-label="Interactive Eco Equilibrium field"
-          >
-            <defs>
-              <linearGradient
-                id="fieldFloor"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop offset="0%" stopColor="#e3e3e3" />
-                <stop offset="100%" stopColor="#cccccc" />
-              </linearGradient>
+      <div className="p-2 sm:p-4">
+        <div className="relative aspect-[7/4] w-full overflow-hidden border-[clamp(4px,0.8vw,9px)] border-gray-600 bg-[#d8d8d4] text-gray-950">
+          <div className="absolute inset-y-0 left-1/2 border-l border-dashed border-gray-500/50" />
 
-              <filter id="fieldGlow">
-                <feGaussianBlur
-                  stdDeviation="5"
-                  result="blur"
-                />
-
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            {/* Field surface and guardrails */}
-            <rect
-              x="75"
-              y="75"
-              width="750"
-              height="500"
-              fill="url(#fieldFloor)"
-              stroke="#7b7b7b"
-              strokeWidth="20"
-            />
-
-            {/* Mitigators */}
-            <rect
-              x="94"
-              y="33"
-              width="145"
-              height="82"
-              fill="#282828"
-            />
-
-            <rect
-              x="661"
-              y="33"
-              width="145"
-              height="82"
-              fill="#282828"
-            />
-
-            {/* Dispensers */}
-            <circle
-              cx="382"
-              cy="57"
-              r="52"
-              fill="#282828"
-            />
-
-            <circle
-              cx="518"
-              cy="57"
-              r="52"
-              fill="#282828"
-            />
-
-            {/* Accelerators */}
-            <rect
-              x="76"
-              y="525"
-              width="58"
-              height="50"
-              fill="#282828"
-            />
-
-            <rect
-              x="766"
-              y="525"
-              width="58"
-              height="50"
-              fill="#282828"
-            />
-
-            {/* Ecosystem connecting bars */}
-            <line
-              x1="450"
-              y1="245"
-              x2="330"
-              y2="442"
-              stroke="#282828"
-              strokeWidth="12"
-            />
-
-            <line
-              x1="450"
-              y1="245"
-              x2="570"
-              y2="442"
-              stroke="#282828"
-              strokeWidth="12"
-            />
-
-            <line
-              x1="330"
-              y1="442"
-              x2="570"
-              y2="442"
-              stroke="#282828"
-              strokeWidth="12"
-            />
-
-            {/* Interactive ecosystems */}
-            {ecosystems.map((ecosystem) => {
-              const active =
-                selection.kind === "ecosystem" &&
-                selection.id === ecosystem.id;
-
-              const visibleUnits = Math.min(
-                12,
-                Math.max(0, Math.round(ecosystem.units)),
-              );
-
-              return (
-                <g
-                  key={ecosystem.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${ecosystem.label}: ${ecosystem.units} Biodiversity Units`}
-                  className="cursor-pointer outline-none"
-                  onMouseEnter={() =>
-                    setSelection({
-                      kind: "ecosystem",
-                      id: ecosystem.id,
-                    })
-                  }
-                  onClick={() =>
-                    setSelection({
-                      kind: "ecosystem",
-                      id: ecosystem.id,
-                    })
-                  }
-                  onFocus={() =>
-                    setSelection({
-                      kind: "ecosystem",
-                      id: ecosystem.id,
-                    })
-                  }
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter" ||
-                      event.key === " "
-                    ) {
-                      setSelection({
-                        kind: "ecosystem",
-                        id: ecosystem.id,
-                      });
-                    }
-                  }}
-                >
-                  <polygon
-                    points={ecosystem.points}
-                    fill={active ? "#365314" : "#282828"}
-                    stroke={
-                      active ? "#a3e635" : "#282828"
-                    }
-                    strokeWidth={active ? 7 : 2}
-                    filter={
-                      active
-                        ? "url(#fieldGlow)"
-                        : undefined
-                    }
-                  />
-
-                  {Array.from({
-                    length: visibleUnits,
-                  }).map((_, index) => {
-                    const column = index % 4;
-                    const row = Math.floor(index / 4);
-
-                    return (
-                      <circle
-                        key={index}
-                        cx={
-                          ecosystem.x -
-                          27 +
-                          column * 18
-                        }
-                        cy={
-                          ecosystem.y -
-                          20 +
-                          row * 18
-                        }
-                        r="6"
-                        fill="#bef264"
-                        stroke="#365314"
-                        strokeWidth="2"
-                      />
-                    );
-                  })}
-                </g>
-              );
-            })}
+          {/* Physical ropes: center-to-red, center-to-blue and red-to-blue. */}
+          <svg viewBox="0 0 700 400" preserveAspectRatio="none" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full">
+            <line x1="350" y1="140" x2="256" y2="280" stroke="#374151" strokeWidth="9" />
+            <line x1="350" y1="140" x2="444" y2="280" stroke="#374151" strokeWidth="9" />
+            <line x1="256" y1="280" x2="444" y2="280" stroke="#374151" strokeWidth="9" />
           </svg>
+
+          {/* Mitigators. */}
+          <div className="absolute left-[2%] top-0 z-20 flex h-[16%] w-[21%] items-center justify-center border-2 border-gray-700 bg-gray-800 text-center text-white">
+            <div><span className="block text-[clamp(7px,1vw,12px)] font-bold uppercase text-gray-300">Red mitigator</span><strong className="font-mono text-[clamp(18px,2.8vw,34px)] leading-none">{displayValue(barriersRed)}</strong><span className="block text-[clamp(7px,0.9vw,11px)] text-gray-300">barriers</span></div>
+          </div>
+          <div className="absolute right-[2%] top-0 z-20 flex h-[16%] w-[21%] items-center justify-center border-2 border-gray-700 bg-gray-800 text-center text-white">
+            <div><span className="block text-[clamp(7px,1vw,12px)] font-bold uppercase text-gray-300">Blue mitigator</span><strong className="font-mono text-[clamp(18px,2.8vw,34px)] leading-none">{displayValue(barriersBlue)}</strong><span className="block text-[clamp(7px,0.9vw,11px)] text-gray-300">barriers</span></div>
+          </div>
+
+          <Ecosystem className="left-[42.5%] top-[22%]" label="Center ecosystem" units={biodiversityCenter} approximate={numberValue(details, "approximateBiodiversityCenterEcosystem")} />
+          <Ecosystem className="left-[29%] top-[57%]" label="Red ecosystem" units={biodiversityRed} approximate={numberValue(details, "approximateBiodiversityRedSideEcosystem")} />
+          <Ecosystem className="right-[29%] top-[57%]" label="Blue ecosystem" units={biodiversityBlue} approximate={numberValue(details, "approximateBiodiversityBlueSideEcosystem")} />
+
+          <AllianceStation alliance="red" teams={redTeams} details={details} />
+          <AllianceStation alliance="blue" teams={blueTeams} details={details} />
+
+          <div className="absolute bottom-[2%] left-1/2 z-40 grid w-[44%] -translate-x-1/2 grid-cols-3 divide-x divide-gray-700 border-2 border-gray-700 bg-gray-900 text-center text-white">
+            <div className="px-1 py-[2%]"><span className="block text-[clamp(6px,0.8vw,10px)] uppercase text-gray-400">Distribution</span><strong className="font-mono text-[clamp(9px,1.4vw,17px)]">{displayValue(distributionFactor)}×</strong></div>
+            <div className="px-1 py-[2%]"><span className="block text-[clamp(6px,0.8vw,10px)] uppercase text-gray-400">Biodiversity</span><strong className="font-mono text-[clamp(9px,1.4vw,17px)]">{displayValue(distributed)} pts</strong></div>
+            <div className="px-1 py-[2%]"><span className="block text-[clamp(6px,0.8vw,10px)] uppercase text-gray-400">Coopertition</span><strong className="font-mono text-[clamp(9px,1.4vw,17px)]">+{displayValue(coopertition)}</strong></div>
+          </div>
         </div>
-
-        <aside className="border-t border-gray-800 bg-gray-900 p-5 lg:border-l lg:border-t-0">
-          {selectedEcosystem && (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-lime-400">
-                Ecosystem
-              </p>
-
-              <h3 className="mt-2 text-lg font-bold">
-                {selectedEcosystem.label}
-              </h3>
-
-              <p className="mt-5 text-5xl font-black text-lime-300">
-                {selectedEcosystem.units}
-              </p>
-
-              <p className="mt-1 text-sm text-gray-400">
-                Biodiversity Units added in this match
-              </p>
-
-              <div className="mt-5 rounded-xl border border-gray-700 bg-gray-950 p-4">
-                <p className="text-xs uppercase tracking-wider text-gray-500">
-                  Approximate ecosystem level
-                </p>
-
-                <p className="mt-1 text-2xl font-bold">
-                  {selectedEcosystem.approximate}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {selectedRobot &&
-            (() => {
-              const info = protectionInfo(
-                selectedRobot.increment,
-              );
-
-              const teamId = String(
-                selectedRobot.team.teamKey ??
-                  selectedRobot.team.id ??
-                  "",
-              );
-
-              const slug = formatTeamSlug(
-                selectedRobot.team.country,
-                selectedRobot.team.countryCode,
-                teamId,
-              );
-
-              return (
-                <div>
-                  <p
-                    className={`text-xs font-bold uppercase tracking-[0.2em] ${
-                      selectedRobot.alliance === "red"
-                        ? "text-red-400"
-                        : "text-blue-400"
-                    }`}
-                  >
-                    {selectedRobot.alliance} alliance robot{" "}
-                    {selectedRobot.index + 1}
-                  </p>
-
-                  <Link
-                    href={`/team/${slug}`}
-                    className="mt-2 block text-lg font-bold transition hover:text-sky-300 hover:underline"
-                  >
-                    {fullTeamName(selectedRobot.team)}
-                  </Link>
-
-                  <p className="mt-5 text-5xl font-black">
-                    {info.level}
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-400">
-                    Protection Level
-                  </p>
-
-                  <div className="mt-5 rounded-xl border border-gray-700 bg-gray-950 p-4">
-                    <p className="text-xs uppercase tracking-wider text-gray-500">
-                      Multiplier increment
-                    </p>
-
-                    <p className="mt-1 text-2xl font-bold">
-                      +{selectedRobot.increment}
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-
-          <div className="mt-6 border-t border-gray-800 pt-4">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-gray-500">
-              Robot protection
-            </p>
-
-            <div className="grid grid-cols-3 gap-2">
-              {robots.map((robot) => {
-                const info = protectionInfo(
-                  robot.increment,
-                );
-
-                const active =
-                  selection.kind === "robot" &&
-                  selection.alliance ===
-                    robot.alliance &&
-                  selection.index === robot.index;
-
-                return (
-                  <button
-                    key={`${robot.alliance}-${robot.index}`}
-                    type="button"
-                    onMouseEnter={() =>
-                      setSelection({
-                        kind: "robot",
-                        alliance: robot.alliance,
-                        index: robot.index,
-                      })
-                    }
-                    onFocus={() =>
-                      setSelection({
-                        kind: "robot",
-                        alliance: robot.alliance,
-                        index: robot.index,
-                      })
-                    }
-                    onClick={() =>
-                      setSelection({
-                        kind: "robot",
-                        alliance: robot.alliance,
-                        index: robot.index,
-                      })
-                    }
-                    className={`rounded-lg border px-2 py-2 text-center transition ${
-                      robot.alliance === "red"
-                        ? active
-                          ? "border-red-400 bg-red-950 text-red-100"
-                          : "border-red-900/60 bg-red-950/30 text-red-300"
-                        : active
-                          ? "border-blue-400 bg-blue-950 text-blue-100"
-                          : "border-blue-900/60 bg-blue-950/30 text-blue-300"
-                    }`}
-                  >
-                    <span className="block text-xs font-bold">
-                      {shortTeamLabel(robot.team)}
-                    </span>
-
-                    <span className="mt-1 block text-lg font-black">
-                      L{info.level}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-6 border-t border-gray-800 pt-4 text-xs leading-5 text-gray-500">
-            Level 0 = field surface
-            <br />
-            Levels 1–4 = increasingly higher Rope
-            support
-          </div>
-        </aside>
       </div>
     </section>
   );

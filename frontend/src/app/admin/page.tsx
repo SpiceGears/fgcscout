@@ -1,26 +1,25 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Database, FileJson, RefreshCw, Trash2, UploadCloud, Youtube } from "lucide-react";
+import { CheckCircle2, Database, FileJson, KeyRound, LogOut, Play, RefreshCw, Save, Settings2, Trash2, UploadCloud } from "lucide-react";
 
 type SeasonSummary = {
   year: number;
+  name: string;
   matchCount: number;
+  sourceUrl: string;
+  syncEnabled: boolean;
+  syncIntervalMinutes: number;
+  lastSyncAt?: string;
+  lastSyncError?: string;
+  lastSyncMatchCount?: number;
 };
 
 type SeasonFile = {
   matches?: unknown[];
 };
 
-type AdminMatch = {
-  id: string;
-  data?: {
-    name?: string;
-    videoUrl?: string;
-  };
-};
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function getErrorMessage(payload: unknown) {
   if (payload && typeof payload === "object" && "error" in payload) {
@@ -39,43 +38,69 @@ export default function AdminPage() {
   const [loadingSeasons, setLoadingSeasons] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
-  const [videoYear, setVideoYear] = useState<number | null>(null);
-  const [videoMatches, setVideoMatches] = useState<AdminMatch[]>([]);
-  const [videoMatchId, setVideoMatchId] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
+  const [adminKey, setAdminKey] = useState("");
+  const [keyInput, setKeyInput] = useState("");
+  const [authorized, setAuthorized] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [configYear, setConfigYear] = useState(new Date().getFullYear());
+  const [configName, setConfigName] = useState(`FIRST Global Challenge ${new Date().getFullYear()}`);
+  const [configSourceUrl, setConfigSourceUrl] = useState("https://results.first.global/");
+  const [configSyncEnabled, setConfigSyncEnabled] = useState(false);
+  const [configInterval, setConfigInterval] = useState(5);
 
-  const loadSeasons = useCallback(async () => {
+  const loadSeasons = useCallback(async (credential: string) => {
     setLoadingSeasons(true);
+    setCheckingAccess(true);
     try {
-      const response = await fetch(`${API_URL}/api/admin/seasons`, { cache: "no-store" });
-      if (!response.ok) throw new Error("Could not load seasons.");
-      setSeasons((await response.json()) as SeasonSummary[]);
+      const response = await fetch(`${API_URL}/api/admin/seasons`, {
+        cache: "no-store",
+        headers: { "X-Admin-Key": credential },
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) sessionStorage.removeItem("fgcscout.adminKey");
+        throw new Error(getErrorMessage(payload));
+      }
+      setSeasons(payload as SeasonSummary[]);
+      setAuthorized(true);
+      setAdminKey(credential);
+      sessionStorage.setItem("fgcscout.adminKey", credential);
+      setNotice(null);
+      return true;
     } catch (error) {
+      setAuthorized(false);
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Could not load seasons." });
+      return false;
     } finally {
       setLoadingSeasons(false);
+      setCheckingAccess(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSeasons();
+    const storedKey = sessionStorage.getItem("fgcscout.adminKey") ?? "";
+    setKeyInput(storedKey);
+    if (storedKey) void loadSeasons(storedKey);
+    else {
+      setLoadingSeasons(false);
+      setCheckingAccess(false);
+    }
   }, [loadSeasons]);
 
-  useEffect(() => {
-    if (videoYear === null && seasons.length > 0) setVideoYear(seasons[0].year);
-  }, [seasons, videoYear]);
+  const unlockAdmin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const credential = keyInput.trim();
+    if (credential) await loadSeasons(credential);
+  };
 
-  useEffect(() => {
-    if (videoYear === null) return;
-    fetch(`${API_URL}/api/GameData/${videoYear}`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : [])
-      .then((matches: AdminMatch[]) => {
-        setVideoMatches(matches);
-        const first = matches[0];
-        setVideoMatchId(first?.id ?? "");
-        setVideoUrl(first?.data?.videoUrl ?? "");
-      });
-  }, [videoYear]);
+  const lockAdmin = () => {
+    sessionStorage.removeItem("fgcscout.adminKey");
+    setAdminKey("");
+    setKeyInput("");
+    setAuthorized(false);
+    setSeasons([]);
+    setNotice(null);
+  };
 
   const existingSeason = useMemo(
     () => seasons.find((season) => season.year === detectedYear),
@@ -132,7 +157,7 @@ export default function AdminPage() {
         `${API_URL}/api/admin/importSeason?replaceExisting=${replaceExisting}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Admin-Key": adminKey },
           body: fileText,
         },
       );
@@ -148,7 +173,7 @@ export default function AdminPage() {
         kind: "success",
         message: `Season ${payload.year} loaded: ${payload.playedMatches} matches and ${payload.upsertedTeams} teams${payload.replacedMatches ? ` (replaced ${payload.replacedMatches} matches)` : ""}.`,
       });
-      await loadSeasons();
+      await loadSeasons(adminKey);
     } catch (error) {
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Import failed." });
     } finally {
@@ -161,11 +186,14 @@ export default function AdminPage() {
     setBusy(true);
     setNotice(null);
     try {
-      const response = await fetch(`${API_URL}/api/admin/seasons/${season.year}`, { method: "DELETE" });
+      const response = await fetch(`${API_URL}/api/admin/seasons/${season.year}`, {
+        method: "DELETE",
+        headers: { "X-Admin-Key": adminKey },
+      });
       const payload = await response.json();
       if (!response.ok) throw new Error(getErrorMessage(payload));
       setNotice({ kind: "success", message: `Season ${season.year} was deleted.` });
-      await loadSeasons();
+      await loadSeasons(adminKey);
     } catch (error) {
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Delete failed." });
     } finally {
@@ -173,41 +201,91 @@ export default function AdminPage() {
     }
   };
 
-  const selectVideoMatch = (id: string) => {
-    setVideoMatchId(id);
-    setVideoUrl(videoMatches.find((match) => match.id === id)?.data?.videoUrl ?? "");
+  const editSeason = (season: SeasonSummary) => {
+    setConfigYear(season.year);
+    setConfigName(season.name || `FIRST Global Challenge ${season.year}`);
+    setConfigSourceUrl(season.sourceUrl || "https://results.first.global/");
+    setConfigSyncEnabled(season.syncEnabled);
+    setConfigInterval(season.syncIntervalMinutes || 5);
+    document.getElementById("season-sync-settings")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const saveVideo = async () => {
-    if (!videoMatchId) return;
+  const saveSeasonConfiguration = async (event: React.FormEvent) => {
+    event.preventDefault();
     setBusy(true);
     setNotice(null);
     try {
-      const response = await fetch(`${API_URL}/api/admin/matches/${videoMatchId}/video`, {
+      const response = await fetch(`${API_URL}/api/admin/seasons/${configYear}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: videoUrl.trim() || null }),
+        headers: { "Content-Type": "application/json", "X-Admin-Key": adminKey },
+        body: JSON.stringify({
+          name: configName,
+          sourceUrl: configSourceUrl,
+          syncEnabled: configSyncEnabled,
+          syncIntervalMinutes: configInterval,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(getErrorMessage(payload));
-      setVideoMatches((current) => current.map((match) => match.id === videoMatchId ? { ...match, data: { ...match.data, videoUrl: videoUrl.trim() } } : match));
-      setNotice({ kind: "success", message: videoUrl.trim() ? "YouTube video saved for this match." : "Match video removed." });
+      setNotice({ kind: "success", message: `Season ${configYear} synchronization settings saved.` });
+      await loadSeasons(adminKey);
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Could not save video." });
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Could not save season settings." });
     } finally {
       setBusy(false);
     }
   };
 
+  const syncSeason = async (season: SeasonSummary) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/seasons/${season.year}/sync`, {
+        method: "POST",
+        headers: { "X-Admin-Key": adminKey },
+      });
+      const payload = await response.json() as { error?: string; matches?: number; insertedMatches?: number; updatedMatches?: number };
+      if (!response.ok) throw new Error(getErrorMessage(payload));
+      setNotice({ kind: "success", message: `Season ${season.year} synced: ${payload.matches ?? 0} matches (${payload.insertedMatches ?? 0} new, ${payload.updatedMatches ?? 0} updated).` });
+      await loadSeasons(adminKey);
+    } catch (error) {
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Synchronization failed." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!authorized) {
+    return (
+      <main className="page-shell flex items-center justify-center">
+        <form onSubmit={unlockAdmin} className="panel w-full max-w-md p-6">
+          <KeyRound className="h-6 w-6 text-sky-400" />
+          <h1 className="mt-5 text-2xl font-semibold text-white">Administrator access</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-400">Enter the server-side admin key. It is stored only until this browser tab is closed.</p>
+          <label className="mt-6 block text-sm text-gray-400">Admin key
+            <input type="password" value={keyInput} onChange={(event) => setKeyInput(event.target.value)} autoComplete="current-password" className="control mt-2 w-full px-4 py-3" autoFocus />
+          </label>
+          {notice && <p className="mt-3 text-sm text-red-300">{notice.message}</p>}
+          <button disabled={!keyInput.trim() || checkingAccess} className="mt-5 w-full rounded-xl bg-sky-600 px-5 py-3 font-semibold text-white hover:bg-sky-500 disabled:opacity-40">
+            {checkingAccess ? "Checking…" : "Unlock admin"}
+          </button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-950 px-4 py-8 text-gray-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8">
+        <div className="mb-8 flex items-start justify-between gap-5">
+          <div>
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-400">Control center</p>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Season administration</h1>
           <p className="mt-3 max-w-2xl text-gray-400">
             A single JSON file represents one FIRST Global season. Importing with replacement keeps the season clean and prevents duplicate matches.
           </p>
+          </div>
+          <button onClick={lockAdmin} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-gray-700 px-3 py-2 text-sm text-gray-400 hover:bg-gray-800 hover:text-white"><LogOut className="h-4 w-4" />Lock</button>
         </div>
 
         {notice && (
@@ -261,44 +339,59 @@ export default function AdminPage() {
                 <div className="rounded-2xl bg-sky-500/15 p-3 text-sky-300"><Database /></div>
                 <div><h2 className="text-xl font-semibold">Stored seasons</h2><p className="text-sm text-gray-400">{seasons.length} available</p></div>
               </div>
-              <button onClick={loadSeasons} disabled={loadingSeasons} className="rounded-xl border border-gray-700 p-2 text-gray-300 hover:bg-gray-800" aria-label="Refresh seasons"><RefreshCw className={`h-5 w-5 ${loadingSeasons ? "animate-spin" : ""}`} /></button>
+              <button onClick={() => loadSeasons(adminKey)} disabled={loadingSeasons} className="rounded-xl border border-gray-700 p-2 text-gray-300 hover:bg-gray-800" aria-label="Refresh seasons"><RefreshCw className={`h-5 w-5 ${loadingSeasons ? "animate-spin" : ""}`} /></button>
             </div>
 
             <div className="mt-6 space-y-3">
               {!loadingSeasons && seasons.length === 0 && <p className="rounded-2xl bg-gray-950 p-5 text-sm text-gray-400">No seasons loaded yet.</p>}
               {seasons.map((season) => (
-                <div key={season.year} className="flex items-center justify-between rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
-                  <div><p className="text-lg font-semibold">Season {season.year}</p><p className="text-sm text-gray-500">{season.matchCount} matches</p></div>
-                  <button onClick={() => deleteSeason(season)} disabled={busy} className="rounded-xl border border-red-900 p-2 text-red-400 transition hover:bg-red-950 disabled:opacity-40" aria-label={`Delete season ${season.year}`}><Trash2 className="h-5 w-5" /></button>
+                <div key={season.year} className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="text-lg font-semibold">{season.name || `Season ${season.year}`}</p><p className="text-sm text-gray-500">{season.matchCount} matches · {season.syncEnabled ? `live every ${season.syncIntervalMinutes} min` : "manual updates"}</p></div>
+                    <div className="flex gap-2">
+                      <button onClick={() => syncSeason(season)} disabled={busy} className="rounded-xl border border-emerald-900 p-2 text-emerald-400 transition hover:bg-emerald-950 disabled:opacity-40" aria-label={`Sync season ${season.year}`}><Play className="h-4 w-4" /></button>
+                      <button onClick={() => editSeason(season)} disabled={busy} className="rounded-xl border border-gray-700 p-2 text-gray-300 transition hover:bg-gray-800 disabled:opacity-40" aria-label={`Configure season ${season.year}`}><Settings2 className="h-4 w-4" /></button>
+                      <button onClick={() => deleteSeason(season)} disabled={busy} className="rounded-xl border border-red-900 p-2 text-red-400 transition hover:bg-red-950 disabled:opacity-40" aria-label={`Delete season ${season.year}`}><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                  {season.lastSyncAt && <p className={`mt-3 text-xs ${season.lastSyncError ? "text-red-400" : "text-gray-600"}`}>{season.lastSyncError ? `Last sync failed: ${season.lastSyncError}` : `Last sync: ${new Date(season.lastSyncAt).toLocaleString()} · ${season.lastSyncMatchCount ?? season.matchCount} source matches`}</p>}
                 </div>
               ))}
             </div>
           </section>
         </div>
 
-        <section id="match-videos" className="mt-6 scroll-mt-6 rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-xl">
+        <form id="season-sync-settings" onSubmit={saveSeasonConfiguration} className="mt-6 rounded-3xl border border-gray-800 bg-gray-900 p-6 shadow-xl scroll-mt-20">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-red-500/15 p-3 text-red-400"><Youtube /></div>
-            <div><h2 className="text-xl font-semibold">Match videos</h2><p className="text-sm text-gray-400">Assign or remove a YouTube recording for an individual match.</p></div>
+            <div className="rounded-2xl bg-emerald-500/15 p-3 text-emerald-300"><RefreshCw /></div>
+            <div><h2 className="text-xl font-semibold">Live season synchronization</h2><p className="text-sm text-gray-400">Create a season before the event and keep it updated from the official results page.</p></div>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-[12rem_1fr]">
-            <label className="text-sm text-gray-400">Season
-              <select value={videoYear ?? ""} onChange={(event) => setVideoYear(Number(event.target.value))} className="mt-2 w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-white">
-                {seasons.map((season) => <option key={season.year} value={season.year}>{season.year}</option>)}
-              </select>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-[9rem_minmax(0,1fr)_9rem]">
+            <label className="text-sm text-gray-400">Year
+              <input type="number" min="2017" max="2100" value={configYear} onChange={(event) => { const year = Number(event.target.value); setConfigYear(year); setConfigName((current) => /^FIRST Global Challenge \d{4}$/.test(current) ? `FIRST Global Challenge ${year}` : current); }} className="control mt-2 w-full px-3 py-2.5" />
             </label>
-            <label className="text-sm text-gray-400">Match
-              <select value={videoMatchId} onChange={(event) => selectVideoMatch(event.target.value)} className="mt-2 w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-white">
-                {videoMatches.map((match) => <option key={match.id} value={match.id}>{match.data?.name ?? match.id}</option>)}
-              </select>
+            <label className="text-sm text-gray-400">Season name
+              <input value={configName} onChange={(event) => setConfigName(event.target.value)} className="control mt-2 w-full px-3 py-2.5" />
+            </label>
+            <label className="text-sm text-gray-400">Interval (minutes)
+              <input type="number" min="1" max="1440" value={configInterval} onChange={(event) => setConfigInterval(Number(event.target.value))} className="control mt-2 w-full px-3 py-2.5" />
             </label>
           </div>
-          <div className="mt-4 flex flex-col gap-3 md:flex-row">
-            <input value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=…" className="min-w-0 flex-1 rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 text-white outline-none focus:border-red-600" />
-            <button onClick={saveVideo} disabled={!videoMatchId || busy} className="rounded-xl bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-500 disabled:opacity-40">{busy ? "Saving…" : "Save video"}</button>
+
+          <label className="mt-4 block text-sm text-gray-400">Results source
+            <input type="url" value={configSourceUrl} onChange={(event) => setConfigSourceUrl(event.target.value)} placeholder="https://results.first.global/" className="control mt-2 w-full px-3 py-2.5" />
+          </label>
+
+          <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex items-center gap-3 text-sm text-gray-300">
+              <input type="checkbox" checked={configSyncEnabled} onChange={(event) => setConfigSyncEnabled(event.target.checked)} className="h-4 w-4 accent-emerald-500" />
+              Refresh automatically during the event
+            </label>
+            <button disabled={busy || !configYear || !configSourceUrl.trim()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"><Save className="h-4 w-4" />Save season</button>
           </div>
-          <p className="mt-3 text-xs text-gray-500">Leave the URL empty and save to remove the current video.</p>
-        </section>
+        </form>
+
       </div>
     </main>
   );

@@ -1,18 +1,15 @@
-import { Home, Users, CalendarDays, Swords, Info, ScrollText, Code, ShieldCheck } from "lucide-react";
-import { FaGithub } from 'react-icons/fa';
+import { Home, Users, CalendarDays, Swords, Info, ScrollText, Scale } from "lucide-react";
 
 
 export const MAIN_NAV_ITEMS = [
-    { label: "Home", href: "/", icon: Home },
+    { label: "Overview", href: "/", icon: Home },
     { label: "Teams", href: "/teams", icon: Users },
     { label: "Matches", href: "/matches", icon: Swords },
     { label: "Events", href: "/events", icon: CalendarDays },
 ];
 
 export const OTHER_NAV_ITEMS = [
-    { label: "Admin", href: "/admin", icon: ShieldCheck },
     { label: "About", href: "/about", icon: Info },
-    { label: "Privacy Policy", href: "/privacy", icon: ScrollText },
-    { label: "API", href: "/api", icon: Code },
-    { label: "Repository", href: "https://github.com/spicegears/fgcscout", icon: FaGithub, isExternal: true },
+    { label: "Privacy", href: "/privacy", icon: ScrollText },
+    { label: "Terms", href: "/terms", icon: Scale },
 ];
