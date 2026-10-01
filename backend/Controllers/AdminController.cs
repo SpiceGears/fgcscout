@@ -62,6 +62,24 @@ public class AdminController : ControllerBase
         return Ok(new { year, deletedMatches });
     }
 
+    [HttpGet("seasons/{year:int}/export")]
+    public async Task<IActionResult> ExportSeason(uint year)
+    {
+        var matches = await _db.GetGameDataAsync(year);
+        if (matches.Count == 0)
+            return NotFound(new { error = $"Season {year} does not contain any matches." });
+
+        var payload = new
+        {
+            matches = matches.Select(match => ConvertBsonToClr(match.Data)).ToList()
+        };
+        var json = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            payload,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+        return File(json, "application/json; charset=utf-8", $"fgcscout-season-{year}.json");
+    }
+
     public sealed record SeasonConfigurationRequest(
         string? Name,
         string? SourceUrl,
@@ -307,6 +325,28 @@ public class AdminController : ControllerBase
         }
 
         return doc;
+    }
+
+    private static object? ConvertBsonToClr(BsonValue? value)
+    {
+        if (value is null || value.IsBsonNull) return null;
+
+        return value.BsonType switch
+        {
+            BsonType.Document => value.AsBsonDocument.ToDictionary(
+                element => element.Name,
+                element => ConvertBsonToClr(element.Value)),
+            BsonType.Array => value.AsBsonArray.Select(ConvertBsonToClr).ToList(),
+            BsonType.String => value.AsString,
+            BsonType.Int32 => value.AsInt32,
+            BsonType.Int64 => value.AsInt64,
+            BsonType.Double => value.AsDouble,
+            BsonType.Decimal128 => value.AsDecimal128.ToString(),
+            BsonType.Boolean => value.AsBoolean,
+            BsonType.DateTime => value.ToUniversalTime(),
+            BsonType.ObjectId => value.AsObjectId.ToString(),
+            _ => value.ToString()
+        };
     }
 
     private BsonValue ConvertJsonElementToBsonValue(System.Text.Json.JsonElement el)

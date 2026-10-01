@@ -69,6 +69,7 @@ services:
         NEXT_PUBLIC_PRIVACY_CONTACT: ${NEXT_PUBLIC_PRIVACY_CONTACT:-}
         NEXT_PUBLIC_OPERATOR_ADDRESS: ${NEXT_PUBLIC_OPERATOR_ADDRESS:-}
         NEXT_PUBLIC_HOSTING_PROVIDER: ${NEXT_PUBLIC_HOSTING_PROVIDER:-}
+        API_PROXY_TARGET: http://backend:80
     restart: unless-stopped
     logging: *default-logging
     depends_on:
@@ -76,6 +77,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      API_PROXY_TARGET: http://backend:80
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
       interval: 15s

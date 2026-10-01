@@ -86,6 +86,9 @@ Open `/admin`, enter the admin key, and add a season under **Live season
 synchronization**. Sources must use HTTPS and the `results.first.global` host;
 this allowlist prevents the server from fetching arbitrary internal URLs.
 
+Each stored season can also be exported from the admin panel as a reusable JSON
+file in the same `{ "matches": [...] }` format accepted by the season importer.
+
 Synchronization updates existing matches, inserts new matches, preserves
 locally assigned YouTube links, and retains unknown game fields. The configured
 year is checked against event keys to prevent importing a different season.

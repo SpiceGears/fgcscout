@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Database, FileJson, KeyRound, LogOut, Play, RefreshCw, Save, Settings2, Trash2, UploadCloud } from "lucide-react";
+import { CheckCircle2, Database, Download, FileJson, KeyRound, LogOut, Play, RefreshCw, Save, Settings2, Trash2, UploadCloud } from "lucide-react";
 
 type SeasonSummary = {
   year: number;
@@ -26,6 +26,19 @@ function getErrorMessage(payload: unknown) {
     return String((payload as { error: unknown }).error);
   }
   return "The server could not process this request.";
+}
+
+async function readApiJson(response: Response): Promise<unknown> {
+  const body = await response.text();
+  if (!body.trim()) return null;
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    const contentType = response.headers.get("content-type") ?? "unknown content type";
+    throw new Error(
+      `API returned ${response.status} ${response.statusText || "response"} as ${contentType}, not JSON. Check that /api routes are connected to the backend.`,
+    );
+  }
 }
 
 export default function AdminPage() {
@@ -56,11 +69,12 @@ export default function AdminPage() {
         cache: "no-store",
         headers: { "X-Admin-Key": credential },
       });
-      const payload = await response.json();
+      const payload = await readApiJson(response);
       if (!response.ok) {
         if (response.status === 401) sessionStorage.removeItem("fgcscout.adminKey");
         throw new Error(getErrorMessage(payload));
       }
+      if (!Array.isArray(payload)) throw new Error("The seasons API returned an invalid response.");
       setSeasons(payload as SeasonSummary[]);
       setAuthorized(true);
       setAdminKey(credential);
@@ -161,7 +175,7 @@ export default function AdminPage() {
           body: fileText,
         },
       );
-      const payload = (await response.json()) as {
+      const payload = (await readApiJson(response)) as {
         error?: string;
         playedMatches?: number;
         upsertedTeams?: number;
@@ -190,12 +204,42 @@ export default function AdminPage() {
         method: "DELETE",
         headers: { "X-Admin-Key": adminKey },
       });
-      const payload = await response.json();
+      const payload = await readApiJson(response);
       if (!response.ok) throw new Error(getErrorMessage(payload));
       setNotice({ kind: "success", message: `Season ${season.year} was deleted.` });
       await loadSeasons(adminKey);
     } catch (error) {
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Delete failed." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportSeason = async (season: SeasonSummary) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/seasons/${season.year}/export`, {
+        cache: "no-store",
+        headers: { "X-Admin-Key": adminKey },
+      });
+      if (!response.ok) {
+        const payload = await readApiJson(response);
+        throw new Error(getErrorMessage(payload));
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `fgcscout-season-${season.year}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      setNotice({ kind: "success", message: `Season ${season.year} exported as JSON.` });
+    } catch (error) {
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Export failed." });
     } finally {
       setBusy(false);
     }
@@ -225,7 +269,7 @@ export default function AdminPage() {
           syncIntervalMinutes: configInterval,
         }),
       });
-      const payload = await response.json();
+      const payload = await readApiJson(response);
       if (!response.ok) throw new Error(getErrorMessage(payload));
       setNotice({ kind: "success", message: `Season ${configYear} synchronization settings saved.` });
       await loadSeasons(adminKey);
@@ -244,7 +288,7 @@ export default function AdminPage() {
         method: "POST",
         headers: { "X-Admin-Key": adminKey },
       });
-      const payload = await response.json() as { error?: string; matches?: number; insertedMatches?: number; updatedMatches?: number };
+      const payload = await readApiJson(response) as { error?: string; matches?: number; insertedMatches?: number; updatedMatches?: number };
       if (!response.ok) throw new Error(getErrorMessage(payload));
       setNotice({ kind: "success", message: `Season ${season.year} synced: ${payload.matches ?? 0} matches (${payload.insertedMatches ?? 0} new, ${payload.updatedMatches ?? 0} updated).` });
       await loadSeasons(adminKey);
@@ -349,6 +393,7 @@ export default function AdminPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div><p className="text-lg font-semibold">{season.name || `Season ${season.year}`}</p><p className="text-sm text-gray-500">{season.matchCount} matches · {season.syncEnabled ? `live every ${season.syncIntervalMinutes} min` : "manual updates"}</p></div>
                     <div className="flex gap-2">
+                      <button onClick={() => exportSeason(season)} disabled={busy || season.matchCount === 0} className="rounded-xl border border-sky-900 p-2 text-sky-400 transition hover:bg-sky-950 disabled:opacity-40" aria-label={`Export season ${season.year} as JSON`} title="Export season JSON"><Download className="h-4 w-4" /></button>
                       <button onClick={() => syncSeason(season)} disabled={busy} className="rounded-xl border border-emerald-900 p-2 text-emerald-400 transition hover:bg-emerald-950 disabled:opacity-40" aria-label={`Sync season ${season.year}`}><Play className="h-4 w-4" /></button>
                       <button onClick={() => editSeason(season)} disabled={busy} className="rounded-xl border border-gray-700 p-2 text-gray-300 transition hover:bg-gray-800 disabled:opacity-40" aria-label={`Configure season ${season.year}`}><Settings2 className="h-4 w-4" /></button>
                       <button onClick={() => deleteSeason(season)} disabled={busy} className="rounded-xl border border-red-900 p-2 text-red-400 transition hover:bg-red-950 disabled:opacity-40" aria-label={`Delete season ${season.year}`}><Trash2 className="h-4 w-4" /></button>

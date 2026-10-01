@@ -35,7 +35,9 @@ services:
       DatabaseSettings__ConnectionString: mongodb://mongodb:27017
       DatabaseSettings__DatabaseName: fgcscout
       AdminSettings__ApiKey: ${FGCSCOUT_ADMIN_API_KEY:-}
-      Cors__AllowedOrigins__0: ${FGCSCOUT_FRONTEND_ORIGIN:-http://localhost:3000}
+      # Development origins are fixed so a production value in .env cannot break local CORS.
+      Cors__AllowedOrigins__0: http://localhost:3000
+      Cors__AllowedOrigins__1: http://127.0.0.1:3000
       SeasonSync__AllowedHosts__0: results.first.global
     volumes:
       - type: bind
