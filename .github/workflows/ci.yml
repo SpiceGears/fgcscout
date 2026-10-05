@@ -68,6 +68,16 @@ jobs:
           FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
         run: node scripts/smoke-test.mjs
 
+      - name: Test video administration against isolated database
+        env:
+          FGCSCOUT_BASE_URL: http://localhost
+          FGCSCOUT_RUN_VIDEO_TESTS: "1"
+        run: node scripts/video-admin-test.mjs
+
+      - name: Test live worker recovery
+        run: |
+          docker compose -f docker-compose.prod.yml run --rm --no-deps -v "${{ github.workspace }}:/source:ro" live-video python -m unittest discover -s /source/live-video -v
+
       - name: Show service logs after failure
         if: failure()
         run: docker compose -f docker-compose.prod.yml logs --no-color
