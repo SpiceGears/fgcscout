@@ -137,3 +137,11 @@ requests are rate-limited, responses are compressed, sensitive containers are
 kept off the host network, MongoDB uses a least-privilege application user, and
 the proxy/frontend apply browser security headers. The API limits imports to
 25 MiB. Never commit `.env`, database archives or generated build directories.
+
+## Archive playlist video timestamps
+
+The [playlist-video tool](playlist-video/README.md) extracts per-match JSON
+records with YouTube links, start timestamps and end timestamps from archived
+field broadcasts. The supplied manifest covers the FGC 2025 playlist. These
+archive detections can be reviewed before assigning videos to matches; the
+archive tool exports JSON and does not automatically update the application.
