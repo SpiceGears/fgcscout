@@ -1,0 +1,31 @@
+{
+  "streams": [
+    {
+      "id": "Hy2VGJjoMoo",
+      "url": "https://www.youtube.com/watch?v=Hy2VGJjoMoo",
+      "day": 1,
+      "field": 1,
+      "matches_detected": 1,
+      "matches": [
+        {
+          "url": "https://www.youtube.com/watch?v=Hy2VGJjoMoo",
+          "start_timestamp": 265.0,
+          "end_timestamp": 415.0,
+          "clock_observations": 15,
+          "clock_spread_seconds": 0.0,
+          "file": "Hy2VGJjoMoo_265.000.json",
+          "sequence_in_stream": 1
+        }
+      ],
+      "samples": 18,
+      "readable_clocks": 17,
+      "review_candidates": [],
+      "status": "processed"
+    }
+  ],
+  "errors": [],
+  "method": "countdown_ocr",
+  "timestamp_unit": "seconds",
+  "boundary_uncertainty_seconds": 2,
+  "completeness_verified": false
+}

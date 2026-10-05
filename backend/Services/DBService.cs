@@ -123,13 +123,23 @@ public class DBService
             incoming.UpdatedAt = now;
             if (existingByKey.TryGetValue(key, out var stored))
             {
-                if (stored.Data.TryGetValue("videoUrl", out var videoUrl) && !incoming.Data.Contains("videoUrl"))
-                    incoming.Data["videoUrl"] = videoUrl;
-
-                incoming.Id = stored.Id;
-                incoming.CreatedAt = stored.CreatedAt;
-                writes.Add(new ReplaceOneModel<GameData>(
-                    Builders<GameData>.Filter.Eq(item => item.Id, stored.Id), incoming));
+                // Update source fields atomically without replacing concurrently saved video metadata.
+                var updates = new List<UpdateDefinition<GameData>>
+                {
+                    Builders<GameData>.Update.Set(item => item.UpdatedAt, now)
+                };
+                foreach (var element in incoming.Data)
+                {
+                    if (!LocalVideoFields.Contains(element.Name))
+                        updates.Add(Builders<GameData>.Update.Set($"data.{element.Name}", element.Value));
+                }
+                foreach (var element in stored.Data)
+                {
+                    if (!LocalVideoFields.Contains(element.Name) && !incoming.Data.Contains(element.Name))
+                        updates.Add(Builders<GameData>.Update.Unset($"data.{element.Name}"));
+                }
+                writes.Add(new UpdateOneModel<GameData>(
+                    Builders<GameData>.Filter.Eq(item => item.Id, stored.Id), Builders<GameData>.Update.Combine(updates)));
                 updated++;
             }
             else
@@ -193,16 +203,40 @@ public class DBService
         return await GetGameDataAsync(objectId);
     }
 
-    public async Task<bool> UpdateMatchVideoAsync(string id, string? videoUrl)
+    private static readonly HashSet<string> LocalVideoFields = new(StringComparer.Ordinal)
+    {
+        "videoUrl", "videoStartTimestamp", "videoEndTimestamp", "videoStatus", "videoDetectionId"
+    };
+
+    public async Task<bool> UpdateMatchVideoAsync(string id, string? videoUrl,
+        double? startTimestamp = null, double? endTimestamp = null, string? status = null,
+        string? detectionId = null, bool onlyIfEmpty = false)
     {
         if (!ObjectId.TryParse(id, out var objectId))
             return false;
 
-        var field = "data.videoUrl";
-        UpdateDefinition<GameData> update = string.IsNullOrWhiteSpace(videoUrl)
-            ? Builders<GameData>.Update.Unset(field)
-            : Builders<GameData>.Update.Set(field, videoUrl.Trim());
-        var result = await _gameData.UpdateOneAsync(d => d.Id == objectId, update);
+        var filter = Builders<GameData>.Filter.Eq(item => item.Id, objectId);
+        if (onlyIfEmpty)
+        {
+            filter &= Builders<GameData>.Filter.Or(
+                Builders<GameData>.Filter.Exists("data.videoUrl", false),
+                Builders<GameData>.Filter.Eq("data.videoUrl", BsonNull.Value),
+                Builders<GameData>.Filter.Eq("data.videoUrl", ""),
+                Builders<GameData>.Filter.Eq("data.videoDetectionId", detectionId));
+        }
+        var values = new Dictionary<string, BsonValue?>
+        {
+            ["videoUrl"] = string.IsNullOrWhiteSpace(videoUrl) ? null : new BsonString(videoUrl.Trim()),
+            ["videoStartTimestamp"] = startTimestamp.HasValue ? new BsonDouble(startTimestamp.Value) : null,
+            ["videoEndTimestamp"] = endTimestamp.HasValue ? new BsonDouble(endTimestamp.Value) : null,
+            ["videoStatus"] = status is null ? null : new BsonString(status),
+            ["videoDetectionId"] = detectionId is null ? null : new BsonString(detectionId)
+        };
+        var updates = values.Select(pair => string.IsNullOrWhiteSpace(videoUrl) || pair.Value is null
+            ? Builders<GameData>.Update.Unset($"data.{pair.Key}")
+            : Builders<GameData>.Update.Set($"data.{pair.Key}", pair.Value)).ToList();
+        updates.Add(Builders<GameData>.Update.Set(item => item.UpdatedAt, DateTime.UtcNow));
+        var result = await _gameData.UpdateOneAsync(filter, Builders<GameData>.Update.Combine(updates));
         return result.MatchedCount > 0;
     }
 

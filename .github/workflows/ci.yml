@@ -7,6 +7,13 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Compose also interpolates required settings during logs and teardown.
+    env:
+      MONGO_ROOT_PASSWORD: ci-root-password-not-for-production
+      MONGO_APP_PASSWORD: ci-app-password-not-for-production
+      FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
+      CADDY_SITE_ADDRESS: http://localhost
+      FGCSCOUT_FRONTEND_ORIGIN: http://localhost
     steps:
       - uses: actions/checkout@v4
 
@@ -53,12 +60,6 @@ jobs:
         run: dotnet list backend.csproj package --vulnerable --include-transitive
 
       - name: Start production stack
-        env:
-          MONGO_ROOT_PASSWORD: ci-root-password-not-for-production
-          MONGO_APP_PASSWORD: ci-app-password-not-for-production
-          FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
-          CADDY_SITE_ADDRESS: http://localhost
-          FGCSCOUT_FRONTEND_ORIGIN: http://localhost
         run: docker compose -f docker-compose.prod.yml up --build --detach --wait
 
       - name: Run smoke tests

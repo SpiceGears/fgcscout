@@ -82,6 +82,11 @@ On macOS/Linux use
 
 ## Live season synchronization
 
+Automatic video timestamps from concurrent field broadcasts are supported by the
+optional [live-video worker](live-video/README.md). It retains detections until a
+match appears in synchronized season data, then attaches the start and confirmed
+end through the authenticated API.
+
 Open `/admin`, enter the admin key, and add a season under **Live season
 synchronization**. Sources must use HTTPS and the `results.first.global` host;
 this allowlist prevents the server from fetching arbitrary internal URLs.
@@ -132,3 +137,11 @@ requests are rate-limited, responses are compressed, sensitive containers are
 kept off the host network, MongoDB uses a least-privilege application user, and
 the proxy/frontend apply browser security headers. The API limits imports to
 25 MiB. Never commit `.env`, database archives or generated build directories.
+
+## Archive playlist video timestamps
+
+The [playlist-video tool](playlist-video/README.md) extracts per-match JSON
+records with YouTube links, start timestamps and end timestamps from archived
+field broadcasts. The supplied manifest covers the FGC 2025 playlist. These
+archive detections can be reviewed before assigning videos to matches; the
+archive tool exports JSON and does not automatically update the application.

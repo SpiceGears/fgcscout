@@ -144,11 +144,31 @@ public class AdminController : ControllerBase
         }
     }
 
-    public sealed record MatchVideoRequest(string? VideoUrl);
+    public sealed record MatchVideoRequest(string? VideoUrl, double? StartTimestamp = null,
+        double? EndTimestamp = null, string? Status = null, string? DetectionId = null,
+        bool OnlyIfEmpty = false);
+
+    [HttpGet("video-capabilities")]
+    public IActionResult VideoCapabilities() => Ok(new { liveVideoVersion = 2 });
 
     [HttpPut("matches/{id}/video")]
     public async Task<IActionResult> SetMatchVideo(string id, [FromBody] MatchVideoRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.VideoUrl) &&
+            (request.StartTimestamp.HasValue || request.EndTimestamp.HasValue || request.Status is not null))
+            return BadRequest(new { error = "Video metadata requires a video URL." });
+        if (request.Status is not null && !request.StartTimestamp.HasValue)
+            return BadRequest(new { error = "Video status requires a start timestamp." });
+        if (request.StartTimestamp is double start && (!double.IsFinite(start) || start < 0) ||
+            request.EndTimestamp is double end && (!double.IsFinite(end) || end < 0) ||
+            request.EndTimestamp.HasValue && (!request.StartTimestamp.HasValue || request.EndTimestamp <= request.StartTimestamp))
+            return BadRequest(new { error = "Invalid video timestamps." });
+        if (request.Status is not null && request.Status is not ("live" or "complete" or "interrupted"))
+            return BadRequest(new { error = "Invalid video status." });
+        if (request.Status == "complete" && !request.EndTimestamp.HasValue)
+            return BadRequest(new { error = "A complete recording needs an end timestamp." });
+        if ((request.DetectionId?.Length ?? 0) > 120 || request.OnlyIfEmpty && string.IsNullOrWhiteSpace(request.DetectionId))
+            return BadRequest(new { error = "A bounded detection ID is required for automatic updates." });
         if (!string.IsNullOrWhiteSpace(request.VideoUrl))
         {
             if (!Uri.TryCreate(request.VideoUrl, UriKind.Absolute, out var uri) ||
@@ -162,9 +182,15 @@ public class AdminController : ControllerBase
             }
         }
 
-        var updated = await _db.UpdateMatchVideoAsync(id, request.VideoUrl);
-        if (!updated) return NotFound(new { error = "Match not found." });
-        return Ok(new { id, videoUrl = request.VideoUrl });
+        var updated = await _db.UpdateMatchVideoAsync(id, request.VideoUrl, request.StartTimestamp,
+            request.EndTimestamp, request.Status, request.DetectionId, request.OnlyIfEmpty);
+        if (!updated)
+        {
+            if (await _db.GetGameDataAsync(id) is null) return NotFound(new { error = "Match not found." });
+            return Conflict(new { error = "This match already has another recording." });
+        }
+        return Ok(new { id, videoUrl = request.VideoUrl, startTimestamp = request.StartTimestamp,
+            endTimestamp = request.EndTimestamp, status = request.Status });
     }
 
     // POST api/admin/importMatches
