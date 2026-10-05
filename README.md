@@ -82,6 +82,11 @@ On macOS/Linux use
 
 ## Live season synchronization
 
+Automatic video timestamps from concurrent field broadcasts are supported by the
+optional [live-video worker](live-video/README.md). It retains detections until a
+match appears in synchronized season data, then attaches the start and confirmed
+end through the authenticated API.
+
 Open `/admin`, enter the admin key, and add a season under **Live season
 synchronization**. Sources must use HTTPS and the `results.first.global` host;
 this allowlist prevents the server from fetching arbitrary internal URLs.

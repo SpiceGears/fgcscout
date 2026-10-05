@@ -29,6 +29,9 @@ type MatchDatum = {
     tournamentKey?: string;
     scheduledTime?: string;
     videoUrl?: string;
+    videoStartTimestamp?: number;
+    videoEndTimestamp?: number;
+    videoStatus?: string;
     field?: number;
     played?: boolean;
     redScore?: number;
@@ -71,7 +74,7 @@ function formatDate(dateString?: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-function toYouTubeEmbed(url?: string) {
+function toYouTubeEmbed(url?: string, startTimestamp?: number, endTimestamp?: number) {
   if (!url) return null;
   try {
     const parsed = new URL(url);
@@ -79,7 +82,17 @@ function toYouTubeEmbed(url?: string) {
     if (parsed.hostname === "youtu.be" || parsed.hostname === "www.youtu.be") videoId = parsed.pathname.slice(1);
     else if (parsed.pathname.startsWith("/shorts/") || parsed.pathname.startsWith("/embed/")) videoId = parsed.pathname.split("/")[2] ?? "";
     else videoId = parsed.searchParams.get("v") ?? "";
-  return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
+    if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return null;
+    const embed = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+    const rawStart = parsed.searchParams.get("start") ?? parsed.searchParams.get("t") ?? "";
+    const timeParts = rawStart.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+    const parsedStart = /^\d+$/.test(rawStart) ? Number(rawStart) : timeParts
+      ? Number(timeParts[1] ?? 0) * 3600 + Number(timeParts[2] ?? 0) * 60 + Number(timeParts[3] ?? 0) : 0;
+    const start = startTimestamp ?? parsedStart;
+    const end = endTimestamp ?? Number(parsed.searchParams.get("end") ?? 0);
+    if (Number.isFinite(start) && start >= 0) embed.searchParams.set("start", String(Math.floor(start)));
+    if (Number.isFinite(end) && end > start) embed.searchParams.set("end", String(Math.ceil(end)));
+    return embed.toString();
   } catch {
     return null;
   }
@@ -200,7 +213,8 @@ export default function MatchPage() {
       setHasStoredAdminKey(true);
       setMatch((current) => current ? {
         ...current,
-        data: { ...current.data, videoUrl: payload.videoUrl ?? undefined },
+        data: { ...current.data, videoUrl: payload.videoUrl ?? undefined,
+          videoStartTimestamp: undefined, videoEndTimestamp: undefined, videoStatus: undefined },
       } : current);
       setVideoEnabled(false);
       setEditingVideo(false);
@@ -224,7 +238,7 @@ export default function MatchPage() {
   const eventName = data.eventKey ?? `FIRST Global Challenge ${match.year ?? ""}`;
   const redScore = data.redScore ?? 0;
   const blueScore = data.blueScore ?? 0;
-  const videoEmbed = toYouTubeEmbed(data.videoUrl);
+  const videoEmbed = toYouTubeEmbed(data.videoUrl, data.videoStartTimestamp, data.videoEndTimestamp);
   const barriersRed = detailNumber(details, "barriersInRedMitigator");
   const barriersBlue = detailNumber(details, "barriersInBlueMitigator");
   const barrierPoints = barriersRed + barriersBlue;

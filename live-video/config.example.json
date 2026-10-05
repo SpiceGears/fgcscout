@@ -1,0 +1,22 @@
+{
+  "api_url": "http://localhost:5000",
+  "year": 2026,
+  "api_poll_seconds": 15,
+  "state_file": "state/live.sqlite3",
+  "streams": [
+    {
+      "field": 1,
+      "url": "https://www.youtube.com/watch?v=REPLACE_ID1",
+      "match_duration": 150,
+      "name_pattern": "(?:Qualification|Ranking) Match (\\d+)",
+      "clock_roi": [0.447, 0.800, 0.108, 0.075],
+      "identity_roi": [0.32, 0.958, 0.122, 0.037],
+      "overlay_pattern": "Match\\s*(\\d+)\\s*[/|]?\\s*Field\\s*(\\d+)"
+    },
+    {
+      "field": 2,
+      "url": "https://www.youtube.com/watch?v=REPLACE_ID2",
+      "match_duration": 150
+    }
+  ]
+}
