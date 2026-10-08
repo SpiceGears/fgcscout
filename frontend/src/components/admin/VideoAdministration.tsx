@@ -198,7 +198,7 @@ export default function VideoAdministration({ adminKey, seasons }: { adminKey: s
       {!loaded && year > 0 && !notice?.error && <p className="mt-5 text-sm text-gray-400">Loading video settings…</p>}
       {mode === "archive" && (
         <div className="mt-5" role="tabpanel" aria-label="Historical recordings">
-          <p className="text-sm leading-6 text-gray-400">Choose matches.json from the playlist script, a single match JSON or completed live detections. Files without match numbers need manual assignment. Existing recordings are protected.</p>
+          <p className="text-sm leading-6 text-gray-400">Choose matches.json from the playlist script, a single match JSON or completed live detections. Match numbers and fields are matched automatically within the selected season. Unreadable overlays need manual assignment. Existing recordings are protected.</p>
           <label className="mt-4 block rounded-2xl border border-dashed border-gray-700 bg-gray-950/50 p-5 text-sm">
             <span className="mb-3 block">{fileName || "Choose timestamp JSON"}</span><input aria-label="Timestamp JSON" type="file" accept=".json,application/json" disabled={!loaded || busy} onChange={(event) => { void selectFile(event.target.files?.[0]); event.target.value = ""; }} className="w-full text-gray-400" />
           </label>

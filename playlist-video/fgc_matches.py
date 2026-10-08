@@ -5,6 +5,7 @@ External programs: current yt-dlp, ffmpeg, ffprobe, tesseract.
 The OCR ROI is calibrated to the supplied FGC 2025 individual field streams.
 """
 import argparse
+from collections import Counter
 import concurrent.futures
 import json
 import re
@@ -16,6 +17,7 @@ from pathlib import Path
 
 PLAYLIST = 'https://www.youtube.com/playlist?list=PL-RL-gR4GAfdUMblMbZmF_AsT5X9M4ppt'
 ROI = (0.447, 0.800, 0.108, 0.075)
+IDENTITY_ROI = (0.32, 0.958, 0.122, 0.037)
 WIDTH, HEIGHT = 360, 180
 
 
@@ -161,6 +163,65 @@ def detect(samples, duration=150, step=10, min_hits=4):
     return clean, rejected
 
 
+def parse_identity(text):
+    match = re.search(r'\bMatch\s*(\d+)\s*[/|]?\s*Field\s*(\d+)\b', text, re.I)
+    if not match:
+        return None
+    number, field = map(int, match.groups())
+    return (number, field) if number > 0 and 1 <= field <= 100 else None
+
+
+def identity_consensus(samples, expected_field=None):
+    identities = Counter(value for sample in samples
+                         if (value := parse_identity(sample['text'])) is not None)
+    # Repeated evidence inside the running match; never infer identity from order.
+    if not identities:
+        return None, 'unreadable match/field overlay'
+    if len(identities) != 1:
+        return None, 'conflicting match/field observations'
+    (number, field), hits = identities.most_common(1)[0]
+    if hits < 3:
+        return None, 'fewer than three matching identity observations'
+    if expected_field is not None and field != expected_field:
+        return None, 'overlay field differs from stream field'
+    return {'match_number': number, 'field': field}, None
+
+
+def identify(video, match, roi, cache, offset=0, expected_field=None):
+    # Sample five interior frames, away from overlay transitions at game boundaries.
+    times = [match['start_timestamp'] + (match['end_timestamp'] - match['start_timestamp']) * fraction
+             for fraction in (.15, .3, .5, .7, .85)]
+    signature = {'video_size': video.stat().st_size, 'video_mtime_ns': video.stat().st_mtime_ns,
+                 'roi': roi, 'times': times, 'offset': offset, 'version': 1}
+    samples = None
+    if cache.exists():
+        old = json.loads(cache.read_text())
+        if old.get('signature') == signature:
+            samples = old['samples']
+    if samples is None:
+        samples = []
+        x, y, w, h = roi
+        vf = (f'crop=iw*{w}:ih*{h}:iw*{x}:ih*{y},'
+              'scale=1000:180:flags=lanczos,format=gray')
+        for timestamp in times:
+            if timestamp < offset:
+                continue
+            frame = subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(timestamp - offset),
+                                    '-i', str(video), '-frames:v', '1', '-vf', vf,
+                                    '-f', 'image2pipe', '-vcodec', 'pgm', 'pipe:1'],
+                                   capture_output=True, timeout=40)
+            if frame.returncode or not frame.stdout:
+                raise RuntimeError('Could not decode match identity frame')
+            result = subprocess.run(['tesseract', 'stdin', 'stdout', '--psm', '7', '-l', 'eng'],
+                                    input=frame.stdout, capture_output=True, timeout=15)
+            if result.returncode:
+                raise RuntimeError('Could not read match identity frame')
+            samples.append({'t': round(timestamp, 3), 'text': result.stdout.decode().strip()})
+        save(cache, {'signature': signature, 'samples': samples})
+    identity, reason = identity_consensus(samples, expected_field)
+    return identity, {'observations': samples, 'review_reason': reason}
+
+
 def download(entry, args):
     target = args.cache / 'videos'
     target.mkdir(parents=True, exist_ok=True)
@@ -203,12 +264,15 @@ def main():
     parser.add_argument('--duration', type=float, default=150)
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--roi', type=float, nargs=4, default=list(ROI), metavar=('X','Y','W','H'))
+    parser.add_argument('--identity-roi', type=float, nargs=4, default=list(IDENTITY_ROI), metavar=('X','Y','W','H'))
+    parser.add_argument('--event-key', help='Optional event key to disambiguate matches when importing')
+    parser.add_argument('--tournament-key', help='Optional tournament key to disambiguate matches when importing')
     args = parser.parse_args()
     if not 1 <= args.step <= 15 or args.workers < 1 or args.duration <= 30:
         parser.error('step must be 1..15, workers >= 1, duration > 30')
-    x, y, w, h = args.roi
-    if not (x >= 0 and y >= 0 and w > 0 and h > 0 and x+w <= 1 and y+h <= 1):
-        parser.error('ROI must lie inside normalized frame bounds 0..1')
+    for x, y, w, h in (args.roi, args.identity_roi):
+        if not (x >= 0 and y >= 0 and w > 0 and h > 0 and x+w <= 1 and y+h <= 1):
+            parser.error('ROI must lie inside normalized frame bounds 0..1')
     if args.local_video and not args.video_id:
         parser.error('--local-video requires --video-id')
     for program in ('ffmpeg', 'ffprobe', 'tesseract') + (() if args.local_video else (args.yt_dlp,)):
@@ -246,14 +310,34 @@ def main():
                 # Stable filename by timestamp preserves replays as separate recordings.
                 record = {'url': entry['url'], 'start_timestamp': match['start_timestamp'],
                           'end_timestamp': match['end_timestamp']}
+                try:
+                    identity, evidence = identify(video, match, args.identity_roi,
+                        args.cache / f"{entry['id']}_{match['start_timestamp']:.3f}.identity.json",
+                        offset=args.offset, expected_field=entry.get('field'))
+                except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as exc:
+                    # Keep valid timestamps even if identity decoding fails for this match.
+                    identity, evidence = None, {'observations': [],
+                        'review_reason': f'identity scan failed: {type(exc).__name__}'}
+                if identity:
+                    record.update(identity)
+                    if args.event_key:
+                        record['event_key'] = args.event_key
+                    if args.tournament_key:
+                        record['tournament_key'] = args.tournament_key
                 filename = f"{entry['id']}_{match['start_timestamp']:.3f}.json"
                 save(args.output / 'matches' / filename, record)
                 all_matches.append(record)
-                detailed.append({**record, **match, 'file': filename, 'sequence_in_stream': index})
+                detailed.append({**record, **match, 'identity': evidence,
+                                 'file': filename, 'sequence_in_stream': index})
+                if not identity:
+                    rejected.append({'first_timestamp': match['start_timestamp'],
+                                     'reason': evidence['review_reason']})
             stream_report = {**entry, 'matches_detected': len(found), 'matches': detailed,
                              'samples': len(samples), 'readable_clocks': sum(s['remaining'] is not None for s in samples),
                              'review_candidates': rejected,
-                             'status': 'processed' if found else 'needs_review_no_matches'}
+                             'status': ('needs_review_no_matches' if not found else
+                                        'needs_review_identity' if any(m['identity']['review_reason'] for m in detailed)
+                                        else 'processed')}
             report['streams'].append(stream_report)
             print(f'  {len(found)} matches; {len(rejected)} review candidates', flush=True)
         except (RuntimeError, OSError, ValueError) as exc:

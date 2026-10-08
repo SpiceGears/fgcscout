@@ -78,6 +78,9 @@ jobs:
         run: |
           docker compose -f docker-compose.prod.yml run --rm --no-deps -v "${{ github.workspace }}:/source:ro" live-video python -m unittest discover -s /source/live-video -v
 
+      - name: Test archived match identity
+        run: docker compose -f docker-compose.prod.yml run --rm --no-deps -v "${{ github.workspace }}:/source:ro" live-video python -m unittest discover -s /source/playlist-video -v
+
       - name: Show service logs after failure
         if: failure()
         run: docker compose -f docker-compose.prod.yml logs --no-color

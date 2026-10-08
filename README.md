@@ -151,8 +151,9 @@ archive tool exports JSON and does not automatically update the application.
 The `/admin` **Match videos** section has two tabs:
 
 - **Historical recordings**: select a season and upload the playlist script's
-  `matches.json` (or one match JSON). Preview the assignments, select the match
-  for each unidentified recording, then import. Existing videos are protected;
+  `matches.json` (or one match JSON). The script reads the match number and field from the broadcast overlay.
+  Preview the automatic assignments, select the match for any unidentified
+  recording, then import. Existing videos are protected;
   an interrupted upload can be safely repeated. The same file recognizes
   recordings already imported into this season, including their assignments.
 - **Live streams**: set one YouTube URL per field, check the broadcast settings,
