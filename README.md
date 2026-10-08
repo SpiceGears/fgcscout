@@ -140,7 +140,7 @@ Before launch, verify:
 - the privacy page names the actual operator, address, hosting provider and working contact address;
 - the public domain, HTTPS redirect and certificate work from another network;
 - a fresh backup exists and a restore has been tested;
-- only ports 80, 443 and administrative SSH are open on the host;
+- only the configured ingress ports (6080/6443 by default) and administrative SSH are open on the host;
 - admin secrets are stored outside Git and rotated if exposed;
 - event rankings, awards, match scoring and video embeds match the official
   season source on desktop and mobile.
