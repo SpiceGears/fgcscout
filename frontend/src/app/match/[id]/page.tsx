@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, CalendarClock, Check, ExternalLink, Link2, MapPin, Pencil, Play, X, Youtube } from "lucide-react";
 import { formatTeamName, formatTeamSlug } from "@/lib/country";
 import FieldVisualization from "@/components/match/FieldVisualization";
+import WildfireMatchDetails, { WildfireOverview } from "@/components/match/WildfireMatchDetails";
 import GenericMatchDetails from "@/components/match/GenericMatchDetails";
 
 type Participant = {
@@ -238,6 +239,8 @@ export default function MatchPage() {
   const eventName = data.eventKey ?? `FIRST Global Challenge ${match.year ?? ""}`;
   const redScore = data.redScore ?? 0;
   const blueScore = data.blueScore ?? 0;
+  const played = data.played !== false;
+  const isWildfire = match.year === 2026;
   const videoEmbed = toYouTubeEmbed(data.videoUrl, data.videoStartTimestamp, data.videoEndTimestamp);
   const barriersRed = detailNumber(details, "barriersInRedMitigator");
   const barriersBlue = detailNumber(details, "barriersInBlueMitigator");
@@ -256,7 +259,7 @@ export default function MatchPage() {
   const blueProtectedScore = sharedBasePoints * blueProtectionMultiplier;
   const redRobotProtection = [1, 2, 3].map((robot) => detailNumber(details, `redRobot${["", "One", "Two", "Three"][robot]}Parking`));
   const blueRobotProtection = [1, 2, 3].map((robot) => detailNumber(details, `blueRobot${["", "One", "Two", "Three"][robot]}Parking`));
-  const isEcoEquilibrium = Boolean(details && (
+  const isEcoEquilibrium = !isWildfire && Boolean(details && (
     "biodiversityUnitsCenterEcosystem" in details ||
     "barriersInRedMitigator" in details ||
     "redProtectionMultiplier" in details
@@ -274,11 +277,14 @@ export default function MatchPage() {
           </div>
           <div className="mt-3 flex flex-wrap gap-5 text-sm text-gray-500">
             <span className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />{formatDate(data.scheduledTime)}</span>
+            <span className={`rounded-full px-3 py-1 font-semibold ${played ? "bg-emerald-950/50 text-emerald-300" : "bg-amber-950/50 text-amber-300"}`}>{played ? "Played" : "Not played yet"}</span>
             <span className="flex items-center gap-2"><MapPin className="h-4 w-4" />Field {data.field ?? "—"}</span>
           </div>
         </header>
 
-        {isEcoEquilibrium && <FieldVisualization details={details} redTeams={redTeams} blueTeams={blueTeams} />}
+        <p className="mt-3 text-xs text-slate-500">Results refresh automatically every 30 seconds after the server synchronizes the official API.</p>
+        {isWildfire && <WildfireOverview details={details} played={played} />}
+        {isEcoEquilibrium && played && <FieldVisualization details={details} redTeams={redTeams} blueTeams={blueTeams} />}
 
         <div className="mt-7 grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(430px,0.95fr)]">
           <div>
@@ -289,18 +295,18 @@ export default function MatchPage() {
                   <tr className="border-t border-gray-700 bg-red-950/55">
                     {redTeams.map((team) => <td key={`${team.station}-${team.teamKey}`} className="border-r border-red-900/60"><TeamLink team={team} /></td>)}
                     {Array.from({ length: Math.max(0, 3 - redTeams.length) }).map((_, index) => <td key={`red-empty-${index}`} className="border-r border-red-900/60" />)}
-                    <td className="bg-red-900/45 px-3 py-3 text-2xl font-black text-red-300">{redScore}</td>
+                    <td className="bg-red-900/45 px-3 py-3 text-2xl font-black text-red-300">{played ? redScore : "—"}</td>
                   </tr>
                   <tr className="border-t border-gray-700 bg-blue-950/55">
                     {blueTeams.map((team) => <td key={`${team.station}-${team.teamKey}`} className="border-r border-blue-900/60"><TeamLink team={team} /></td>)}
                     {Array.from({ length: Math.max(0, 3 - blueTeams.length) }).map((_, index) => <td key={`blue-empty-${index}`} className="border-r border-blue-900/60" />)}
-                    <td className="bg-blue-900/45 px-3 py-3 text-2xl font-black text-blue-300">{blueScore}</td>
+                    <td className="bg-blue-900/45 px-3 py-3 text-2xl font-black text-blue-300">{played ? blueScore : "—"}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {isEcoEquilibrium ? <><h2 className="mt-7 text-2xl font-semibold">Detailed Results</h2>
+            {isWildfire ? <WildfireMatchDetails details={details} played={played} redScore={data.redScore} blueScore={data.blueScore} redMinPen={data.redMinPen} redMajPen={data.redMajPen} blueMinPen={data.blueMinPen} blueMajPen={data.blueMajPen} /> : !played ? <p className="mt-7 rounded-xl border border-amber-900/50 bg-amber-950/20 p-5 text-amber-200">Not played yet. Results will appear after the official API update.</p> : isEcoEquilibrium ? <><h2 className="mt-7 text-2xl font-semibold">Detailed Results</h2>
             <div className="mt-3 overflow-hidden rounded-xl border border-gray-700 bg-gray-900">
               <div className="border-b border-gray-700 bg-emerald-950/45 px-5 py-3 text-center font-bold text-emerald-300">Global Alliance scoring</div>
               <table className="w-full border-collapse text-sm">
@@ -341,9 +347,9 @@ export default function MatchPage() {
                     <td className="bg-blue-900/55 px-4 py-3 text-center text-blue-100">{data.blueMinPen ?? 0} / {data.blueMajPen ?? 0}</td>
                   </tr>
                   <tr className="border-t border-gray-600 text-base font-black">
-                    <td className="bg-red-800/70 px-4 py-3 text-center">{redScore}</td>
+                    <td className="bg-red-800/70 px-4 py-3 text-center">{played ? redScore : "—"}</td>
                     <td className="bg-gray-800 px-4 py-3 text-center">Total Score</td>
-                    <td className="bg-blue-800/70 px-4 py-3 text-center">{blueScore}</td>
+                    <td className="bg-blue-800/70 px-4 py-3 text-center">{played ? blueScore : "—"}</td>
                   </tr>
                 </tbody>
               </table>

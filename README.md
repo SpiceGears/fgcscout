@@ -151,7 +151,7 @@ archive tool exports JSON and does not automatically update the application.
 The `/admin` **Match videos** section has two tabs:
 
 - **Historical recordings**: select a season and upload the playlist script's
-  `matches.json` (or one match JSON). The script reads the match number and field from the broadcast overlay.
+  `matches.json` (or one match JSON). The script reads the match number from the broadcast overlay.
   Preview the automatic assignments, select the match for any unidentified
   recording, then import. Existing videos are protected;
   an interrupted upload can be safely repeated. The same file recognizes
@@ -179,3 +179,21 @@ The panel reports retry/timeline errors; the worker never invents timestamps
 for missing footage. Configure/verify the scoreboard crop and broadcast origin
 for each year's streams before enabling watching. Automatic identity matching
 currently supports Qualification and Ranking match names.
+
+## FIRST Global 2026
+
+`data-2026.json` is the supplied official API snapshot: 340 scheduled Ranking
+Matches and 2 played Test Matches. Upload it under `/admin` to make the season
+available. To receive subsequent results, configure the season's current official
+results URL and enable synchronization; this snapshot itself does not update.
+
+Match pages select Igniting Innovation scoring for 2026 and retain Eco Equilibrium
+for 2025. Unplayed matches show teams, schedule and pending scores. Pages refresh
+every 30 seconds; match tables refresh from their existing season polling.
+The 2026 manual is linked beside the scoring explanation. Official scores and
+bonuses come from the API; the suppression subtotal rounds up per the manual.
+
+Archive imports and live reconciliation accept a unique match number without
+requiring a field. Optional event/tournament keys disambiguate overlapping numbers.
+Ambiguous numbers are never attached automatically. Fields still identify the
+configured stream channels and appear in the match metadata provided by the API.

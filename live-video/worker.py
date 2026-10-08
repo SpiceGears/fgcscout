@@ -198,10 +198,10 @@ def observations(segment_bytes, cfg, base):
             match = re.fullmatch(r'(\d):([0-5]\d)', re.sub(r'\s','',clock))
             remaining = int(match[1])*60+int(match[2]) if match else None
             footer = read_text(image, cfg['identity_roi'])
-            identity = re.search(cfg.get('overlay_pattern', r'Match\s*(\d+)\s*[/|]?\s*Field\s*(\d+)'), footer, re.I)
+            identity = re.search(cfg.get('overlay_pattern', r'Match\s*(\d+)\b(?:\s*[/|]?\s*Field\s*(\d+)\b)?'), footer, re.I)
             yield {'t': base+index*step, 'remaining': remaining,
                    'number': int(identity[1]) if identity else None,
-                   'field': int(identity[2]) if identity else None}
+                   'field': int(identity[2]) if identity and identity.lastindex and identity.lastindex >= 2 and identity[2] else None}
 
 
 class Detector:
@@ -214,7 +214,7 @@ class Detector:
         duration = self.cfg['match_duration']
         active = self.state.get('active')
         remaining = obs['remaining']
-        if obs['number'] is None or obs['field'] != self.cfg['field'] or remaining is None or not 0 <= remaining <= duration:
+        if obs['number'] is None or (obs['field'] is not None and obs['field'] != self.cfg['field']) or remaining is None or not 0 <= remaining <= duration:
             return None
         if active and active['status'] == 'live':
             if obs['number'] != active['match_number']:
@@ -274,8 +274,6 @@ def matches_for(detection, rows):
         data = row.get('data', {})
         name = re.fullmatch(detection['name_pattern'], str(data.get('name','')))
         if not name or int(name[1]) != detection['match_number']:
-            continue
-        if str(data.get('field')) != str(detection['field']):
             continue
         if detection.get('event_key') and data.get('eventKey') != detection['event_key']:
             continue

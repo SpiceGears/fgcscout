@@ -9,15 +9,14 @@ zapisuje jako osobny JSON oraz wpis w zbiorczym `matches.json`.
   "url": "https://www.youtube.com/watch?v=Hy2VGJjoMoo",
   "start_timestamp": 265.0,
   "end_timestamp": 415.0,
-  "match_number": 1,
-  "field": 1
+  "match_number": 1
 }
 ```
 
 Timestampy to sekundy od początku filmu. Start oznacza start zegara gry,
 koniec — dojście zegara do zera. Skrypt zakłada mecz trwający 150 sekund,
-zgodnie z zegarem w tych transmisjach. Numer meczu i pole są odczytywane z nakładki transmisji. Skrypt sprawdza pięć
-klatek wewnątrz meczu i wymaga co najmniej trzech zgodnych odczytów. Sprzeczny
+zgodnie z zegarem w tych transmisjach. Numer meczu jest odczytywany z nakładki transmisji. Skrypt sprawdza pięć
+klatek wewnątrz meczu i wymaga co najmniej trzech zgodnych odczytów numeru; pole nie jest wymagane. Sprzeczny
 numer, nieczytelna nakładka lub pole inne niż w tytule streamu pozostawiają
 wpis bez identyfikacji i dodają go do kontroli w `report.json`. Pliki identyfikuje
 ID filmu i timestamp startu. Powtórki pozostają osobnymi wpisami.
@@ -67,7 +66,7 @@ cięciem; zwykłe cięcie do najbliższej klatki kluczowej może przesunąć cza
 1. Uruchom skrypt z `--playlist 'URL_PLAYLISTY'` (przykład powyżej).
 2. W `/admin` otwórz **Match videos → Historical recordings**, wybierz sezon
    z zaimportowanymi wynikami i wgraj `results/matches.json`.
-3. Podgląd automatycznie przypisze rozpoznany numer i pole do jednoznacznego
+3. Podgląd automatycznie przypisze rozpoznany numer do jednoznacznego
    meczu Qualification/Ranking w wybranym sezonie. Kliknij **Import**.
 
 Nieczytelne nakładki, powtórki tego samego meczu i niejednoznaczne dopasowania
@@ -119,5 +118,5 @@ odrzucanie nieruchomego zegara i wykrywanie kilku meczów w danych testowych.
 Pełne przetwarzanie wszystkich 15 nagrań nie zostało wykonane.
 
 Rozpoznawanie tożsamości sprawdzono na tym samym rzeczywistym fragmencie:
-trzy zgodne odczyty potwierdziły **Match 1 / Field 1**. JSON zawiera numer i pole
+trzy zgodne odczyty potwierdziły **Match 1**. JSON zawiera numer meczu
 obsługiwane przez automatyczne przypisanie w importerze admina.

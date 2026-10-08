@@ -11,7 +11,12 @@ class ArchiveIdentityTests(unittest.TestCase):
         reads = self.samples('| Match 1| Field 1', '| Match 1 | Field 1',
                              '| Match 1 | Field 1', '| Match 1/| Field 1', '| Match 1]! Field 1')
         identity, reason = identity_consensus(reads, expected_field=1)
-        self.assertEqual(identity, {'match_number': 1, 'field': 1})
+        self.assertEqual(identity, {'match_number': 1})
+        self.assertIsNone(reason)
+
+    def test_number_without_field(self):
+        identity, reason = identity_consensus(self.samples(*(['Match 12'] * 5)), 4)
+        self.assertEqual(identity, {'match_number': 12})
         self.assertIsNone(reason)
 
     def test_conflicting_match_numbers_need_review(self):

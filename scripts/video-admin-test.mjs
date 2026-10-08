@@ -42,7 +42,7 @@ try {
   assert.equal(invalid.imported, 0);
   assert.equal(invalid.rows[0].status, "invalid");
   assert.equal(invalid.rows[1].status, "not_found");
-  const auto = await api(path, "POST", { entries: [{ ...video, field: 1, match_number: 2 }], dryRun: false });
+  const auto = await api(path, "POST", { entries: [{ ...video, match_number: 2 }], dryRun: false });
   assert.equal(auto.imported, 1);
   // A normal source update must retain imported video metadata.
   await api("/api/admin/importSeason?replaceExisting=false", "POST", season);

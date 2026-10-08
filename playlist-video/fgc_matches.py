@@ -164,27 +164,30 @@ def detect(samples, duration=150, step=10, min_hits=4):
 
 
 def parse_identity(text):
-    match = re.search(r'\bMatch\s*(\d+)\s*[/|]?\s*Field\s*(\d+)\b', text, re.I)
+    match = re.search(r'\bMatch\s*(\d+)\b(?:\s*[/|]?\s*Field\s*(\d+)\b)?', text, re.I)
     if not match:
         return None
-    number, field = map(int, match.groups())
-    return (number, field) if number > 0 and 1 <= field <= 100 else None
+    number = int(match[1])
+    field = int(match[2]) if match[2] else None
+    return (number, field) if number > 0 and (field is None or 1 <= field <= 100) else None
 
 
 def identity_consensus(samples, expected_field=None):
-    identities = Counter(value for sample in samples
-                         if (value := parse_identity(sample['text'])) is not None)
-    # Repeated evidence inside the running match; never infer identity from order.
-    if not identities:
-        return None, 'unreadable match/field overlay'
-    if len(identities) != 1:
+    identities = [value for sample in samples
+                  if (value := parse_identity(sample['text'])) is not None]
+    numbers = Counter(number for number, _ in identities)
+    fields = {field for _, field in identities if field is not None}
+    if not numbers:
+        return None, 'unreadable match overlay'
+    if len(numbers) != 1 or len(fields) > 1:
         return None, 'conflicting match/field observations'
-    (number, field), hits = identities.most_common(1)[0]
+    number, hits = numbers.most_common(1)[0]
     if hits < 3:
         return None, 'fewer than three matching identity observations'
-    if expected_field is not None and field != expected_field:
+    if expected_field is not None and fields and expected_field not in fields:
         return None, 'overlay field differs from stream field'
-    return {'match_number': number, 'field': field}, None
+    # Field is optional metadata. The importer resolves a unique number in the selected season.
+    return {'match_number': number}, None
 
 
 def identify(video, match, roi, cache, offset=0, expected_field=None):

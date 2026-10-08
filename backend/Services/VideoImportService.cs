@@ -51,9 +51,9 @@ public static class VideoImportService
             return new(index, "invalid", null, null, "Use a YouTube URL and finite start/end seconds with end after start.", null);
         var candidates = matches.Where(match => match.Year == year);
         if (!string.IsNullOrWhiteSpace(entry.MatchId)) candidates = candidates.Where(match => match.Id.ToString() == entry.MatchId);
-        else if (entry.Field.HasValue && entry.MatchNumber.HasValue)
+        else if (entry.MatchNumber.HasValue)
         {
-            candidates = candidates.Where(match => Read(match.Data, "field") == entry.Field.Value.ToString(CultureInfo.InvariantCulture) &&
+            candidates = candidates.Where(match => (!entry.Field.HasValue || Read(match.Data, "field") == entry.Field.Value.ToString(CultureInfo.InvariantCulture)) &&
                 Regex.IsMatch(Read(match.Data, "name"), $"^(?:Qualification|Ranking) Match {entry.MatchNumber.Value}$", RegexOptions.IgnoreCase));
         }
         else

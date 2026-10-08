@@ -61,8 +61,17 @@ class LiveTests(unittest.TestCase):
         detection=self.active(worker.Detector(self.cfg,{}))
         self.assertEqual(worker.matches_for(detection,rows)[0]['data']['id'],1)
         self.assertEqual(len(worker.matches_for(detection,rows)),1)
-        self.assertEqual(worker.matches_for(dict(detection,field=2),rows),[])
+        self.assertEqual(len(worker.matches_for(dict(detection,field=2),rows)),1)
         self.assertEqual(len(worker.matches_for(detection,rows+[rows[0]])),2)
+
+    def test_number_without_overlay_field(self):
+        detector = worker.Detector(self.cfg, {})
+        for t, r in [(100, 150), (102, 148), (104, 146), (106, 144)]:
+            record = detector.feed({'t': t, 'remaining': r, 'number': 1, 'field': None})
+        self.assertEqual(record['match_number'], 1)
+        rows = [{'id': 'mongo', 'data': {'name': 'Qualification Match 1'}}]
+        self.assertEqual(len(worker.matches_for(record, rows)), 1)
+        self.assertEqual(len(worker.matches_for(record, rows + rows)), 2)
 
     def test_late_api_persistence_and_completion(self):
         with tempfile.TemporaryDirectory() as temp:

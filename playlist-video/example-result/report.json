@@ -12,7 +12,6 @@
           "start_timestamp": 265.0,
           "end_timestamp": 415.0,
           "match_number": 1,
-          "field": 1,
           "clock_observations": 15,
           "clock_spread_seconds": 0.0,
           "identity": {
