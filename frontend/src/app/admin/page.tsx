@@ -59,7 +59,7 @@ export default function AdminPage() {
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [configYear, setConfigYear] = useState(new Date().getFullYear());
   const [configName, setConfigName] = useState(`FIRST Global Challenge ${new Date().getFullYear()}`);
-  const [configSourceUrl, setConfigSourceUrl] = useState("https://results.first.global/");
+  const [configSourceUrl, setConfigSourceUrl] = useState("https://api.first.global/v1");
   const [configSyncEnabled, setConfigSyncEnabled] = useState(false);
   const [configInterval, setConfigInterval] = useState(5);
 
@@ -250,7 +250,7 @@ export default function AdminPage() {
   const editSeason = (season: SeasonSummary) => {
     setConfigYear(season.year);
     setConfigName(season.name || `FIRST Global Challenge ${season.year}`);
-    setConfigSourceUrl(season.sourceUrl || "https://results.first.global/");
+    setConfigSourceUrl(season.sourceUrl || "https://api.first.global/v1");
     setConfigSyncEnabled(season.syncEnabled);
     setConfigInterval(season.syncIntervalMinutes || 5);
     document.getElementById("season-sync-settings")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -427,7 +427,8 @@ export default function AdminPage() {
           </div>
 
           <label className="mt-4 block text-sm text-gray-400">Results source
-            <input type="url" value={configSourceUrl} onChange={(event) => setConfigSourceUrl(event.target.value)} placeholder="https://results.first.global/" className="control mt-2 w-full px-3 py-2.5" />
+            <input type="url" value={configSourceUrl} onChange={(event) => setConfigSourceUrl(event.target.value)} placeholder="https://api.first.global/v1" className="control mt-2 w-full px-3 py-2.5" />
+            <span className="mt-1 block text-xs text-gray-500">Current official JSON feed: https://api.first.global/v1</span>
           </label>
 
           <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

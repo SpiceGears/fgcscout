@@ -19,7 +19,7 @@ public sealed class SeasonSyncService
         _db = db;
         _importService = importService;
         _allowedHosts = new HashSet<string>(
-            configuration.GetSection("SeasonSync:AllowedHosts").Get<string[]>() ?? ["results.first.global"],
+            configuration.GetSection("SeasonSync:AllowedHosts").Get<string[]>() ?? ["api.first.global", "results.first.global"],
             StringComparer.OrdinalIgnoreCase);
     }
 

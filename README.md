@@ -88,7 +88,8 @@ match appears in synchronized season data, then attaches the start and confirmed
 end through the authenticated API.
 
 Open `/admin`, enter the admin key, and add a season under **Live season
-synchronization**. Sources must use HTTPS and the `results.first.global` host;
+synchronization**. The current official JSON feed is `https://api.first.global/v1`. Sources must
+use HTTPS and the `api.first.global` or `results.first.global` host;
 this allowlist prevents the server from fetching arbitrary internal URLs.
 
 Each stored season can also be exported from the admin panel as a reusable JSON

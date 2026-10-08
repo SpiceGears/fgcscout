@@ -37,7 +37,7 @@ public class AdminController : ControllerBase
                 year,
                 name = configuration?.Name ?? $"FIRST Global Challenge {year}",
                 matchCount = await _db.CountGameDataAsync(year),
-                sourceUrl = configuration?.SourceUrl ?? "https://results.first.global/",
+                sourceUrl = configuration?.SourceUrl ?? "https://api.first.global/v1",
                 syncEnabled = configuration?.SyncEnabled ?? false,
                 syncIntervalMinutes = configuration?.SyncIntervalMinutes ?? 5,
                 lastSyncAt = configuration?.LastSyncAt,
@@ -92,7 +92,7 @@ public class AdminController : ControllerBase
     {
         if (year < 2017 || year > 2100) return BadRequest(new { error = "Enter a valid FIRST Global season year." });
         if ((request.Name?.Length ?? 0) > 120) return BadRequest(new { error = "Season name cannot exceed 120 characters." });
-        var sourceUrl = string.IsNullOrWhiteSpace(request.SourceUrl) ? "https://results.first.global/" : request.SourceUrl.Trim();
+        var sourceUrl = string.IsNullOrWhiteSpace(request.SourceUrl) ? "https://api.first.global/v1" : request.SourceUrl.Trim();
         if (sourceUrl.Length > 2048 || !Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri))
             return BadRequest(new { error = "The sync source must be an absolute HTTPS URL." });
         try
