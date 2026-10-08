@@ -112,13 +112,19 @@ services:
     environment:
       CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-http://localhost}
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${FGCSCOUT_HTTP_PORT:-6080}:80"
+      - "${FGCSCOUT_HTTPS_PORT:-6443}:443"
+      - "${FGCSCOUT_HTTPS_PORT:-6443}:443/udp"
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 4 -O /dev/null http://127.0.0.1:2019/config/ && wget -q -T 4 -O /dev/null http://frontend:3000/ && wget -q -T 4 -O /dev/null http://backend/health"]
+      interval: 15s
+      timeout: 15s
+      retries: 3
+      start_period: 15s
 
 volumes:
   mongo_data:
