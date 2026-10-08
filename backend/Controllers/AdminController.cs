@@ -58,6 +58,7 @@ public class AdminController : ControllerBase
             return NotFound(new { error = $"Season {year} was not found." });
 
         await _db.RemoveSeasonConfigurationAsync(year);
+        await _db.RemoveLiveVideoConfigurationAsync(year);
 
         return Ok(new { year, deletedMatches });
     }

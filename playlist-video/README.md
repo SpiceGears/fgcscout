@@ -8,15 +8,18 @@ zapisuje jako osobny JSON oraz wpis w zbiorczym `matches.json`.
 {
   "url": "https://www.youtube.com/watch?v=Hy2VGJjoMoo",
   "start_timestamp": 265.0,
-  "end_timestamp": 415.0
+  "end_timestamp": 415.0,
+  "match_number": 1
 }
 ```
 
 Timestampy to sekundy od początku filmu. Start oznacza start zegara gry,
 koniec — dojście zegara do zera. Skrypt zakłada mecz trwający 150 sekund,
-zgodnie z zegarem w tych transmisjach. Numeracja meczów nie jest rozpoznawana;
-pliki identyfikuje ID filmu i timestamp startu. Powtórki pozostają osobnymi
-wpisami.
+zgodnie z zegarem w tych transmisjach. Numer meczu jest odczytywany z nakładki transmisji. Skrypt sprawdza pięć
+klatek wewnątrz meczu i wymaga co najmniej trzech zgodnych odczytów numeru; pole nie jest wymagane. Sprzeczny
+numer, nieczytelna nakładka lub pole inne niż w tytule streamu pozostawiają
+wpis bez identyfikacji i dodają go do kontroli w `report.json`. Pliki identyfikuje
+ID filmu i timestamp startu. Powtórki pozostają osobnymi wpisami.
 
 ## Uruchomienie
 
@@ -58,6 +61,24 @@ Jeśli plik jest fragmentem, `--offset 250` oznacza, że jego pierwsza klatka
 odpowiada sekundzie 250 oryginalnego filmu. Używaj fragmentów z dokładnym
 cięciem; zwykłe cięcie do najbliższej klatki kluczowej może przesunąć czas.
 
+## Import do FGCScouta
+
+1. Uruchom skrypt z `--playlist 'URL_PLAYLISTY'` (przykład powyżej).
+2. W `/admin` otwórz **Match videos → Historical recordings**, wybierz sezon
+   z zaimportowanymi wynikami i wgraj `results/matches.json`.
+3. Podgląd automatycznie przypisze rozpoznany numer do jednoznacznego
+   meczu Qualification/Ranking w wybranym sezonie. Kliknij **Import**.
+
+Nieczytelne nakładki, powtórki tego samego meczu i niejednoznaczne dopasowania
+wymagają wyboru w podglądzie; skrypt nie zgaduje numerów z kolejności.
+Opcjonalne `--event-key 'KLUCZ_Z_DANYCH'` i `--tournament-key 'KLUCZ_Z_DANYCH'`
+zawężają dopasowanie, gdy sezon obejmuje kilka turniejów. Nie ustawiaj tych
+kluczy na podstawie samego tytułu playlisty.
+
+Dla innego układu transmisji ustaw `--identity-roi X Y W H`; wartości to
+części rozmiaru klatki od 0 do 1. Domyślne kadry zegara i numeru odpowiadają
+transmisjom 2025. Sam wybór sezonu w adminie nie dostosowuje kadru OCR.
+
 ## Wyniki i kontrola
 
 - `results/matches.json` — tablica wszystkich wykrytych meczów.
@@ -78,8 +99,8 @@ Przed importem całego turnieju porównaj liczbę wpisów z harmonogramem meczó
 FGCScouta i sprawdź `review_candidates`. Skrypt nie dopisuje zgadywanych meczów.
 Przesunięcie granic rzędu 1–2 sekund może wynikać z odczytu zegara na obrazie.
 
-Kod wyjścia `2` oznacza błąd pobierania/przetwarzania lub stream bez wykrytych
-meczów. Kod `0` oznacza pomyślne przetwarzanie; pełność listy nadal wymaga
+Kod wyjścia `2` oznacza błąd pobierania/przetwarzania, stream bez wykrytych
+meczów albo nagrania bez potwierdzonego numeru i pola. Pozostałe wyniki są zachowane. Kod `0` oznacza pomyślne przetwarzanie; pełność listy nadal wymaga
 porównania z harmonogramem. Dla różnych podzbiorów transmisji używaj osobnych
 katalogów `--output`, ponieważ zbiorczy JSON obejmuje bieżące uruchomienie.
 
@@ -95,3 +116,7 @@ Potwierdzono taki sam układ zegara na próbkach Day 2 / Field 2 i
 Day 3 / Field 5, zgodność wszystkich 15 ID z metadanymi playlisty oraz
 odrzucanie nieruchomego zegara i wykrywanie kilku meczów w danych testowych.
 Pełne przetwarzanie wszystkich 15 nagrań nie zostało wykonane.
+
+Rozpoznawanie tożsamości sprawdzono na tym samym rzeczywistym fragmencie:
+trzy zgodne odczyty potwierdziły **Match 1**. JSON zawiera numer meczu
+obsługiwane przez automatyczne przypisanie w importerze admina.

@@ -145,3 +145,55 @@ records with YouTube links, start timestamps and end timestamps from archived
 field broadcasts. The supplied manifest covers the FGC 2025 playlist. These
 archive detections can be reviewed before assigning videos to matches; the
 archive tool exports JSON and does not automatically update the application.
+
+## Match video administration
+
+The `/admin` **Match videos** section has two tabs:
+
+- **Historical recordings**: select a season and upload the playlist script's
+  `matches.json` (or one match JSON). The script reads the match number from the broadcast overlay.
+  Preview the automatic assignments, select the match for any unidentified
+  recording, then import. Existing videos are protected;
+  an interrupted upload can be safely repeated. The same file recognizes
+  recordings already imported into this season, including their assignments.
+- **Live streams**: set one YouTube URL per field, check the broadcast settings,
+  enable watching and save. The worker uses these settings automatically; no
+  per-event configuration file or running browser tab is required. The panel
+  shows its heartbeat, each field's status and the pending recording count.
+
+Production Compose starts the managed video worker with the application. For
+local development, set the admin key and add `--profile videos` to the Compose
+command. The standalone `live-video/compose.yml` remains available for operators
+who prefer configuration files. Run only one worker for a given broadcast.
+
+Configuration is persisted in MongoDB. The managed worker retains checkpoints
+and pending detections in the `live_video_state` Docker volume and reconnects
+using its last saved configuration when the API is temporarily unavailable.
+Do not delete either volume. Back up the worker state volume along with the
+MongoDB backup; retaining only the database loses unsent detections. Pausing
+stops observation but keeps reconciling saved detections. Deleting a season
+removes its live configuration so watching stops after the next refresh.
+
+A stream outage can leave unrecoverable live gaps when old segments expire.
+The panel reports retry/timeline errors; the worker never invents timestamps
+for missing footage. Configure/verify the scoreboard crop and broadcast origin
+for each year's streams before enabling watching. Automatic identity matching
+currently supports Qualification and Ranking match names.
+
+## FIRST Global 2026
+
+`data-2026.json` is the supplied official API snapshot: 340 scheduled Ranking
+Matches and 2 played Test Matches. Upload it under `/admin` to make the season
+available. To receive subsequent results, configure the season's current official
+results URL and enable synchronization; this snapshot itself does not update.
+
+Match pages select Igniting Innovation scoring for 2026 and retain Eco Equilibrium
+for 2025. Unplayed matches show teams, schedule and pending scores. Pages refresh
+every 30 seconds; match tables refresh from their existing season polling.
+The 2026 manual is linked beside the scoring explanation. Official scores and
+bonuses come from the API; the suppression subtotal rounds up per the manual.
+
+Archive imports and live reconciliation accept a unique match number without
+requiring a field. Optional event/tournament keys disambiguate overlapping numbers.
+Ambiguous numbers are never attached automatically. Fields still identify the
+configured stream channels and appear in the match metadata provided by the API.

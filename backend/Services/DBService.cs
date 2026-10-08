@@ -29,6 +29,31 @@ public class DBService
         _seasonConfigurations = _database.GetCollection<SeasonConfiguration>("SeasonConfigurations");
     }
 
+    private IMongoCollection<LiveVideoConfiguration> LiveVideos => _database.GetCollection<LiveVideoConfiguration>("LiveVideoConfigurations");
+
+    public async Task<List<LiveVideoConfiguration>> GetLiveVideoConfigurationsAsync() =>
+        await LiveVideos.Find(_ => true).ToListAsync();
+
+    public async Task<LiveVideoConfiguration?> GetLiveVideoConfigurationAsync(uint year) =>
+        await LiveVideos.Find(item => item.Year == year).FirstOrDefaultAsync();
+
+    public async Task SaveLiveVideoConfigurationAsync(uint year, bool enabled, List<LiveVideoStream> streams) =>
+        await LiveVideos.UpdateOneAsync(item => item.Year == year,
+            Builders<LiveVideoConfiguration>.Update.Set(item => item.Enabled, enabled)
+                .Set(item => item.Streams, streams).Inc(item => item.Revision, 1)
+                .Set(item => item.WorkerSeenAt, null).Set(item => item.StreamStatuses, new List<LiveVideoStreamStatus>())
+                .Set(item => item.WorkerError, null), new UpdateOptions { IsUpsert = true });
+
+    public async Task<bool> ReportLiveVideoStatusAsync(uint year, long revision, int pending, string? error, List<LiveVideoStreamStatus> streams)
+    {
+        var result = await LiveVideos.UpdateOneAsync(item => item.Year == year && item.Revision == revision,
+            Builders<LiveVideoConfiguration>.Update.Set(item => item.WorkerSeenAt, DateTime.UtcNow)
+                .Set(item => item.PendingCount, pending).Set(item => item.WorkerError, error).Set(item => item.StreamStatuses, streams));
+        return result.MatchedCount > 0;
+    }
+
+    public async Task RemoveLiveVideoConfigurationAsync(uint year) => await LiveVideos.DeleteOneAsync(item => item.Year == year);
+
     public async Task PingAsync(CancellationToken cancellationToken = default) =>
         await _database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
 

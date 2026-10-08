@@ -3,6 +3,8 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Database, Download, FileJson, KeyRound, LogOut, Play, RefreshCw, Save, Settings2, Trash2, UploadCloud } from "lucide-react";
 
+import VideoAdministration from "@/components/admin/VideoAdministration";
+
 type SeasonSummary = {
   year: number;
   name: string;
@@ -437,6 +439,7 @@ export default function AdminPage() {
           </div>
         </form>
 
+        <VideoAdministration adminKey={adminKey} seasons={seasons} />
       </div>
     </main>
   );

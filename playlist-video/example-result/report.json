@@ -11,8 +11,34 @@
           "url": "https://www.youtube.com/watch?v=Hy2VGJjoMoo",
           "start_timestamp": 265.0,
           "end_timestamp": 415.0,
+          "match_number": 1,
           "clock_observations": 15,
           "clock_spread_seconds": 0.0,
+          "identity": {
+            "observations": [
+              {
+                "t": 287.5,
+                "text": "| Match 1| Field 1"
+              },
+              {
+                "t": 310.0,
+                "text": "| Match 1 | Field 1"
+              },
+              {
+                "t": 340.0,
+                "text": "| Match 1 | Field 1"
+              },
+              {
+                "t": 370.0,
+                "text": "| Match 1/| Field 1"
+              },
+              {
+                "t": 392.5,
+                "text": "| Match 1]! Field 1"
+              }
+            ],
+            "review_reason": null
+          },
           "file": "Hy2VGJjoMoo_265.000.json",
           "sequence_in_stream": 1
         }

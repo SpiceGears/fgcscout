@@ -85,6 +85,20 @@ services:
       retries: 5
       start_period: 20s
 
+  live-video:
+    build:
+      context: ./live-video
+    command: ["python", "managed.py", "--api-url", "http://backend", "--state-dir", "/app/state"]
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      FGCSCOUT_ADMIN_API_KEY: ${FGCSCOUT_ADMIN_API_KEY:?Set FGCSCOUT_ADMIN_API_KEY in .env}
+    volumes:
+      - live_video_state:/app/state
+
   proxy:
     image: caddy:2.10-alpine
     restart: unless-stopped
@@ -110,3 +124,4 @@ volumes:
     name: fgcscout_prod_mongo_data
   caddy_data:
   caddy_config:
+  live_video_state:

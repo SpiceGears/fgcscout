@@ -1,5 +1,22 @@
 # FGCScout — automatic live match videos
 
+## Admin-managed mode
+
+The main production Compose stack runs `managed.py` automatically. Configure
+streams in `/admin` → **Match videos** → **Live streams**. Settings are fetched
+from the authenticated API every 20 seconds and cached on disk for recovery.
+Each season has its own SQLite database, with WAL and FULL synchronization,
+in the persistent `live_video_state` volume. Pending detections still reconcile
+when watching is paused. Worker status is reported to the admin panel; a stale
+heartbeat is shown as disconnected, so saved settings are not confused with an
+actually running observer.
+
+For local development use `docker compose --profile videos -f
+docker-compose.dev.yml up --build` from the repository root, with the admin key
+set in `.env`. The sections below document the alternative standalone mode;
+do not run it alongside managed mode for the same broadcast.
+
+
 This is version 2 of the video detector, integrated with FGCScout at commit
 `618781a49565dfe29dec8241f3c070240439d63a`.
 

@@ -112,6 +112,7 @@ export function MatchesTable({
           {matches.map((match) => {
             const red = allianceTeams(match, 11);
             const blue = allianceTeams(match, 21);
+            const played = (match.data?.played ?? match.played) !== false;
             const redScore = match.data?.redScore ?? 0;
             const blueScore = match.data?.blueScore ?? 0;
             return (
@@ -119,16 +120,14 @@ export function MatchesTable({
                 <td className="min-w-0 bg-gray-800/90 px-1 py-2 sm:px-2">
                   <Link
                     href={`/match/${match.id}`}
-                    className={`block truncate font-mono text-[9px] font-bold hover:underline sm:text-xs ${redScore > blueScore ? "text-red-400" : blueScore > redScore ? "text-sky-400" : "text-gray-200"}`}
+                    className={`block truncate font-mono text-[9px] font-bold hover:underline sm:text-xs ${played && redScore > blueScore ? "text-red-400" : played && blueScore > redScore ? "text-sky-400" : "text-gray-200"}`}
                   >
                     {shortMatchName(match)}
                   </Link>
                 </td>
                 <td className="min-w-0 bg-gray-800/90 px-0.5 py-2 text-center sm:px-2">
                   <Link href={`/match/${match.id}`} className="block truncate whitespace-nowrap font-mono text-[9px] font-semibold text-gray-300 hover:text-white sm:text-xs">
-                    <span className={redScore > blueScore ? "text-red-400" : ""}>{redScore}</span>
-                    <span className="mx-0.5 text-gray-600 sm:mx-1">–</span>
-                    <span className={blueScore > redScore ? "text-sky-400" : ""}>{blueScore}</span>
+                    {played ? <><span className={redScore > blueScore ? "text-red-400" : ""}>{redScore}</span><span className="mx-0.5 text-gray-600 sm:mx-1">–</span><span className={blueScore > redScore ? "text-sky-400" : ""}>{blueScore}</span></> : <span className="font-sans text-amber-300" title="Not played yet">Scheduled</span>}
                   </Link>
                 </td>
                 {red.map((participant, index) => <AllianceTeamCell key={`red-${match.id}-${index}`} participant={participant} alliance="red" currentTeamId={currentTeamId} />)}

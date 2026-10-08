@@ -114,6 +114,7 @@ class Store:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.lock = threading.RLock()
         self.db.execute('PRAGMA journal_mode=WAL')
+        self.db.execute('PRAGMA synchronous=FULL')
         self.db.execute('CREATE TABLE IF NOT EXISTS streams (id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS detections (id TEXT PRIMARY KEY, payload TEXT NOT NULL, revision INTEGER NOT NULL, sent_revision INTEGER NOT NULL DEFAULT 0)')
         self.db.execute('CREATE TABLE IF NOT EXISTS issues (id TEXT PRIMARY KEY, reason TEXT NOT NULL)')
@@ -197,10 +198,10 @@ def observations(segment_bytes, cfg, base):
             match = re.fullmatch(r'(\d):([0-5]\d)', re.sub(r'\s','',clock))
             remaining = int(match[1])*60+int(match[2]) if match else None
             footer = read_text(image, cfg['identity_roi'])
-            identity = re.search(cfg.get('overlay_pattern', r'Match\s*(\d+)\s*[/|]?\s*Field\s*(\d+)'), footer, re.I)
+            identity = re.search(cfg.get('overlay_pattern', r'Match\s*(\d+)\b(?:\s*[/|]?\s*Field\s*(\d+)\b)?'), footer, re.I)
             yield {'t': base+index*step, 'remaining': remaining,
                    'number': int(identity[1]) if identity else None,
-                   'field': int(identity[2]) if identity else None}
+                   'field': int(identity[2]) if identity and identity.lastindex and identity.lastindex >= 2 and identity[2] else None}
 
 
 class Detector:
@@ -213,7 +214,7 @@ class Detector:
         duration = self.cfg['match_duration']
         active = self.state.get('active')
         remaining = obs['remaining']
-        if obs['number'] is None or obs['field'] != self.cfg['field'] or remaining is None or not 0 <= remaining <= duration:
+        if obs['number'] is None or (obs['field'] is not None and obs['field'] != self.cfg['field']) or remaining is None or not 0 <= remaining <= duration:
             return None
         if active and active['status'] == 'live':
             if obs['number'] != active['match_number']:
@@ -273,8 +274,6 @@ def matches_for(detection, rows):
         data = row.get('data', {})
         name = re.fullmatch(detection['name_pattern'], str(data.get('name','')))
         if not name or int(name[1]) != detection['match_number']:
-            continue
-        if str(data.get('field')) != str(detection['field']):
             continue
         if detection.get('event_key') and data.get('eventKey') != detection['event_key']:
             continue
@@ -388,17 +387,22 @@ def segment_start(seg, cfg, state, origin):
     return value
 
 
-def stream_worker(cfg, store):
-    stream_id = hashlib.sha256(cfg['url'].encode()).hexdigest()[:20]
+def stream_identity(cfg):
+    return hashlib.sha256(f"{cfg['url']}|{cfg['field']}".encode()).hexdigest()[:20]
+
+
+def stream_worker(cfg, store, stop=None):
+    stop = STOP if stop is None else stop
+    stream_id = stream_identity(cfg)
     state = store.stream(stream_id)
     detector = Detector(cfg, state)
-    while not STOP.is_set():
+    while not stop.is_set():
         try:
             source, release = resolve(cfg)
             origin = utc(cfg['origin_utc']) if cfg.get('origin_utc') else release
             resolved_at = time.monotonic()
             state['timeline_source'] = 'explicit_utc' if cfg.get('origin_utc') else 'youtube_release_timestamp' if release else 'segment_anchor'
-            while not STOP.is_set():
+            while not stop.is_set():
                 data = media_playlist(source)
                 segments = data['segments']
                 if 'last_sequence' not in state and segments:
@@ -409,6 +413,8 @@ def stream_worker(cfg, store):
                     elif not (segments[0]['seq']==0 and origin is None):
                         segments = segments[-12:]
                 for seg in segments:
+                    if stop.is_set():
+                        return
                     if seg['seq'] <= state.get('last_sequence',-1):
                         continue
                     base = segment_start(seg,cfg,state,origin)
@@ -417,6 +423,8 @@ def stream_worker(cfg, store):
                         init, _ = http(seg['init'])
                         raw = init+raw
                     for obs in observations(raw,cfg,base):
+                        if stop.is_set():
+                            return
                         if obs['t'] <= state.get('last_video_timestamp', -1):
                             continue
                         detected = detector.feed(obs)
@@ -438,14 +446,14 @@ def stream_worker(cfg, store):
                     return
                 if time.monotonic()-resolved_at > 1800:
                     break
-                STOP.wait(2)
+                stop.wait(2)
         except Exception as exc:
             state['status']='retrying'
             # Do not log signed stream URLs, credentials or raw HTTP response bodies.
             state['error'] = f'{type(exc).__name__}: '+(str(exc) if isinstance(exc,ValueError) else 'stream access/decoding failed')
             store.checkpoint(stream_id,state)
             LOG.warning('Field %s: %s',cfg['field'],state['error'])
-            STOP.wait(15)
+            stop.wait(15)
 
 
 def validate(config):
