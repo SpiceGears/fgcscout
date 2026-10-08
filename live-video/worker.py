@@ -301,7 +301,8 @@ def reconcile(store, api_url, year, key):
             store.issue(detection['detection_id'], 'waiting_for_api_match' if not candidates else 'ambiguous_match')
             continue
         data = candidates[0]['data']
-        query = {'t': str(math.floor(detection['start_timestamp']))+'s'}
+        start = math.floor(detection['start_timestamp'])
+        query = {'t': start, 'start': start}
         if detection['end_timestamp'] is not None:
             query['end'] = math.ceil(detection['end_timestamp'])
         video_id = youtube_id(detection['url'])

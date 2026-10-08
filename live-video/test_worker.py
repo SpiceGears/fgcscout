@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 from urllib.error import HTTPError
 import worker
@@ -94,6 +95,9 @@ class LiveTests(unittest.TestCase):
                 rows.append({'id':'mongo-1','data':{'name':'Qualification Match 1','field':1}})
                 self.assertEqual(worker.reconcile(store,'http://localhost',2024,'test'),1)
                 self.assertEqual(calls[0]['status'],'live')
+                query=parse_qs(urlparse(calls[0]['videoUrl']).query)
+                self.assertEqual(query['t'],['100'])
+                self.assertEqual(query['start'],['100'])
                 self.assertIsNone(calls[0]['endTimestamp'])
                 complete=detector.feed({'t':250,'remaining':0,'number':1,'field':1})
                 store.checkpoint('stream',state,complete)
