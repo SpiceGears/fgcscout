@@ -71,6 +71,11 @@ jobs:
           FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
         run: node scripts/smoke-test.mjs
 
+      - name: Verify original tunnel entry point
+        run: |
+          curl --fail --silent http://127.0.0.1:3000/ > /dev/null
+          curl --fail --silent http://127.0.0.1:3000/api/GameData/years | node -e 'let body=""; process.stdin.on("data", chunk => body += chunk); process.stdin.on("end", () => { if (!Array.isArray(JSON.parse(body))) process.exit(1); });'
+
       - name: Test video administration against isolated database
         env:
           FGCSCOUT_BASE_URL: http://localhost

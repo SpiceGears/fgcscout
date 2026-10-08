@@ -60,6 +60,9 @@ services:
 
   frontend:
     image: fgcscout-frontend-prod
+    # Preserve the original localhost:3000 entry point for host-managed tunnels.
+    ports:
+      - "127.0.0.1:3000:3000"
     build:
       context: ./frontend
       dockerfile: Dockerfile

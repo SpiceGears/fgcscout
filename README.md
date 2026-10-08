@@ -45,8 +45,12 @@ docker compose --env-file .env -f docker-compose.prod.yml up --build -d --wait
 node scripts/smoke-test.mjs
 ```
 
-The public site is served by Caddy on ports 80/443. The backend and MongoDB are
-not published directly. Caddy obtains and renews TLS certificates automatically
+The public site is served by Caddy on ports 80/443. Frontend port 3000 is also bound to `127.0.0.1` on the
+server to preserve existing host-managed Cloudflare Tunnel routes. It serves both
+the site and `/api` through the existing backend rewrite. A healthy container
+does not verify the tunnel's route to this listener.
+
+The backend and MongoDB are not published directly. Caddy obtains and renews TLS certificates automatically
 when a real domain is configured. For local production testing, set
 `CADDY_SITE_ADDRESS=http://localhost` and browse `http://localhost`.
 
