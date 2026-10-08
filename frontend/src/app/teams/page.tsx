@@ -1,5 +1,6 @@
 "use client";
 
+import { savedSeason, seasonTeams } from "@/lib/seasonData";
 import { ArrowUpRight, Search, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +17,7 @@ function countryFlag(countryCode?: string) {
 }
 
 export default function Teams() {
+  const [year, setYear] = useState<number | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -24,9 +26,14 @@ export default function Teams() {
     setQuery(new URLSearchParams(window.location.search).get("search") ?? "");
     async function load() {
       try {
-        const response = await fetch(`${API_URL}/api/Teams`);
+        const yearsResponse = await fetch(`${API_URL}/api/GameData/years`, {cache:"no-store"});
+        if (!yearsResponse.ok) return;
+        const selected = savedSeason(await yearsResponse.json() as number[]);
+        setYear(selected);
+        if (selected === null) return;
+        const response = await fetch(`${API_URL}/api/GameData/${selected}`, {cache:"no-store"});
         if (!response.ok) return;
-        const data = (await response.json()) as Team[];
+        const data = seasonTeams(await response.json());
         setTeams(data.sort((a, b) =>
           formatCountryName(a.country, a.countryCode).localeCompare(
             formatCountryName(b.country, b.countryCode),
@@ -61,7 +68,7 @@ export default function Teams() {
           <div>
             <p className="eyebrow">Team directory</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">National teams</h1>
-            <p className="mt-2 text-slate-500">Browse every delegation in the imported FIRST Global dataset.</p>
+            <p className="mt-2 text-slate-500">{year ? `Browse delegations in the ${year} season.` : "Browse delegations in the selected season."}</p>
           </div>
           <div className="flex items-center gap-2 font-mono text-sm text-slate-500">
             <Users className="h-4 w-4" />

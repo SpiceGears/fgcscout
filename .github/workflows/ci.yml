@@ -39,6 +39,9 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
+      - name: Test scheduled-match statistics and season scope
+        run: node scripts/season-data-test.mjs
+
       - name: Test 2026 scoring against supplied API data
         run: node scripts/match-2026-test.mjs
 

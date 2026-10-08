@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { rememberSeason, savedSeason, isPlayed } from "@/lib/seasonData";
 import { useEffect, useMemo, useState } from "react";
 import { Award, BarChart3, CalendarDays, ExternalLink, MapPin, Play } from "lucide-react";
 import { formatTeamName, formatTeamSlug } from "@/lib/country";
@@ -159,7 +160,7 @@ function buildRankings(matches: EventMatch[], year: number | null) {
   const rankings = new Map<string, Ranking>();
   const hasNamedRankingStage = matches.some((match) => /(qualification|ranking match)/i.test(match.data.name ?? ""));
   for (const match of matches) {
-    if (match.data.played === false) continue;
+    if (!isPlayed(match)) continue;
     if (year === 2025) {
       if (!/ranking match/i.test(match.data.name ?? "")) continue;
     } else if (hasNamedRankingStage && match.data.name && !/(qualification|ranking match)/i.test(match.data.name)) {
@@ -208,7 +209,7 @@ function buildRankings(matches: EventMatch[], year: number | null) {
     for (const row of rankings.values()) {
       const teamScores: number[] = [];
       for (const match of matches) {
-        if (match.data.played === false || !/ranking match/i.test(match.data.name ?? "")) continue;
+        if (!isPlayed(match) || !/ranking match/i.test(match.data.name ?? "")) continue;
         const participant = match.data.participants?.find((entry) =>
           String(entry.teamKey ?? entry.countryCode ?? entry.country ?? "") === row.key
         );
@@ -248,8 +249,8 @@ export default function EventsPage() {
     fetch(`${API_URL}/api/GameData/years`, { cache: "no-store" })
       .then((response) => response.ok ? response.json() : [])
       .then((availableYears: number[]) => {
-        setYears(availableYears);
-        setYear(availableYears[0] ?? null);
+        setYears([...availableYears].sort((a, b) => b - a));
+        setYear(savedSeason(availableYears));
         if (availableYears.length === 0) setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -288,7 +289,7 @@ export default function EventsPage() {
   }, [matches]);
   const stats = useMemo(() => {
     const playedMatches = matches.filter((match) =>
-      match.data.played !== false &&
+      isPlayed(match) &&
       typeof match.data.redScore === "number" &&
       typeof match.data.blueScore === "number"
     );
@@ -314,7 +315,7 @@ export default function EventsPage() {
             </div>
           </div>
           <label className="flex min-w-48 flex-col gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Season
-            <select value={year ?? ""} onChange={(event) => setYear(Number(event.target.value))} className="control px-4 py-3 text-sm font-semibold normal-case tracking-normal">
+            <select value={year ?? ""} onChange={(event) => { const selected = Number(event.target.value); rememberSeason(selected); setYear(selected); }} className="control px-4 py-3 text-sm font-semibold normal-case tracking-normal">
               {years.map((availableYear) => <option key={availableYear} value={availableYear}>{availableYear}</option>)}
             </select>
           </label>

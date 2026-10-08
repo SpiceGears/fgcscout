@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberSeason, savedSeason } from "@/lib/seasonData";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Search, Swords } from "lucide-react";
 import { MatchesTable } from "@/components/match/MatchesTable";
@@ -49,8 +50,8 @@ export default function MatchesPage() {
         const response = await fetch(`${API_URL}/api/GameData/years`, { cache: "no-store" });
         if (!response.ok) throw new Error("Could not load seasons.");
         const data = (await response.json()) as number[];
-        setYears(data);
-        setYear(data[0] ?? null);
+        setYears([...data].sort((a, b) => b - a));
+        setYear(savedSeason(data));
         if (data.length === 0) setLoading(false);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : "Could not load seasons.");
@@ -113,7 +114,7 @@ export default function MatchesPage() {
           </div>
           <label className="flex min-w-48 flex-col gap-2 text-sm text-gray-400">
             Season
-            <select value={year ?? ""} onChange={(event) => setYear(Number(event.target.value))} className="control px-4 py-3 font-semibold">
+            <select value={year ?? ""} onChange={(event) => { const selected = Number(event.target.value); rememberSeason(selected); setYear(selected); }} className="control px-4 py-3 font-semibold">
               {years.map((availableYear) => <option key={availableYear} value={availableYear}>{availableYear}</option>)}
             </select>
           </label>

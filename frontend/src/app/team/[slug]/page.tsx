@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatCountryName, formatTeamName, formatTeamSlug } from "@/lib/country";
+import { isPlayed, rememberSeason, savedSeason, teamRecord } from "@/lib/seasonData";
 import { MatchesTable } from "@/components/match/MatchesTable";
 import { getTeamAwards, type AwardPlacement } from "@/constants/EventContent";
 
@@ -29,20 +30,6 @@ type MatchDatum = {
   };
 };
 
-const getParticipantAlliance = (station?: number) => {
-  if (station === undefined || station === null) return undefined;
-  if (station >= 11 && station <= 13) return "red";
-  if (station >= 21 && station <= 23) return "blue";
-  return undefined;
-};
-
-const getTeamAlliance = (participants: MatchParticipant[], teamId: string) => {
-  const participant = participants.find(
-    (p) => String(p.teamKey) === String(teamId)
-  );
-  return participant ? getParticipantAlliance(participant.station) : undefined;
-};
-
 const AWARD_PLACEMENTS: Record<AwardPlacement, { label: string; color: string }> = {
   gold: { label: "Gold", color: "text-amber-400" },
   silver: { label: "Silver", color: "text-gray-300" },
@@ -67,7 +54,7 @@ export default function TeamPage() {
 
     async function load() {
       try {
-        const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+        const base = process.env.NEXT_PUBLIC_API_URL ?? "";
         const [tres, sres, yres] = await Promise.all([
           fetch(`${base}/api/Teams`),
           fetch(`${base}/api/Seasons`),
@@ -105,12 +92,12 @@ export default function TeamPage() {
           const mapped = s.map((x) => ({ year: x.year ?? 0, name: x.name })).sort((a, b) => b.year - a.year);
           setSeasons(mapped);
           if (mapped.length > 0) {
-            setSelectedSeason(mapped[0].year);
+            setSelectedSeason(savedSeason(mapped.map(season => season.year)));
           } else if (years.length > 0) {
-            setSelectedSeason(years[0]);
+            setSelectedSeason(savedSeason(years));
           }
         } else if (years.length > 0) {
-          setSelectedSeason(years[0]);
+          setSelectedSeason(savedSeason(years));
         }
       } catch (e) {
         console.warn(e);
@@ -125,18 +112,22 @@ export default function TeamPage() {
     if (!selectedSeason || !teamId) return;
 
     let active = true;
+    setMatches([]);
     async function loadMatches() {
       try {
-        const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+        const base = process.env.NEXT_PUBLIC_API_URL ?? "";
         const res = await fetch(`${base}/api/GameData/${selectedSeason}`);
         if (!res.ok) return;
         const data = (await res.json()) as MatchDatum[];
+        const seasonParticipant = data.flatMap(match => match.data?.participants ?? []).find(participant =>
+          formatTeamSlug(participant.country, participant.countryCode, String(participant.teamKey ?? "")) === slug);
+        const seasonTeamId = String(seasonParticipant?.teamKey ?? teamId);
         const filtered = data.filter((g) => {
           const parts = g.data?.participants;
           if (!parts) return false;
-          return parts.some((p) => String(p?.teamKey) === String(teamId));
+          return parts.some((p) => String(p?.teamKey) === seasonTeamId);
         });
-        if (active) setMatches(filtered);
+        if (active) { setMatches(filtered); if (seasonParticipant) setTeamId(seasonTeamId); }
       } catch (e) {
         console.warn(e);
       }
@@ -148,7 +139,7 @@ export default function TeamPage() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [selectedSeason, teamId]);
+  }, [selectedSeason, teamId, slug]);
 
   const inferredCountry = useMemo(() => {
     if (team?.country || team?.countryCode) return { country: team?.country, countryCode: team?.countryCode };
@@ -163,40 +154,8 @@ export default function TeamPage() {
     return { country: undefined, countryCode: undefined };
   }, [matches, team, teamId]);
 
-  const record = useMemo(() => {
-    let wins = 0;
-    let losses = 0;
-    let ties = 0;
-
-    if (!teamId) return { wins, losses, ties };
-
-    matches.forEach((match) => {
-      const participants = match.data?.participants ?? [];
-      const alliance = getTeamAlliance(participants, teamId);
-      const redScore = match.data?.redScore ?? 0;
-      const blueScore = match.data?.blueScore ?? 0;
-
-      if (redScore === blueScore) {
-        ties += 1;
-        return;
-      }
-
-      const won =
-        alliance === "red"
-          ? redScore > blueScore
-          : alliance === "blue"
-          ? blueScore > redScore
-          : false;
-
-      if (alliance && won) {
-        wins += 1;
-      } else if (alliance) {
-        losses += 1;
-      }
-    });
-
-    return { wins, losses, ties };
-  }, [matches, teamId]);
+  const playedMatches = useMemo(() => matches.filter(isPlayed), [matches]);
+  const record = useMemo(() => teamRecord(matches, teamId), [matches, teamId]);
 
   const awards = useMemo(
     () => getTeamAwards(selectedSeason, slug),
@@ -233,7 +192,7 @@ export default function TeamPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Season</span>
-            <select className="control px-3 py-2 text-sm" value={selectedSeason ?? undefined} onChange={(e) => setSelectedSeason(Number(e.target.value))}>
+            <select className="control px-3 py-2 text-sm" value={selectedSeason ?? undefined} onChange={(e) => { const year = Number(e.target.value); rememberSeason(year); setSelectedSeason(year); }}>
               {seasons.length > 0 ? (
                 seasons.map((s) => (
                   <option key={s.year} value={s.year}>{s.name ?? s.year}</option>
@@ -259,7 +218,7 @@ export default function TeamPage() {
               </li>
               <li className="p-5">
                 <span className="subtle-label">Matches played</span>
-                <span className="mt-2 block font-mono text-2xl font-semibold text-white">{matches.length}</span>
+                <span className="mt-2 block font-mono text-2xl font-semibold text-white">{playedMatches.length}</span>
               </li>
               <li className="p-5">
                 <span className="subtle-label">Record</span>
@@ -301,7 +260,7 @@ export default function TeamPage() {
             <div className="mb-3">
               <div>
                 <h2 className="text-2xl font-bold text-white">Matches</h2>
-                <p className="text-sm text-gray-400 mt-1">{matches.length} played matches</p>
+                <p className="text-sm text-gray-400 mt-1">{playedMatches.length} played · {matches.length - playedMatches.length} scheduled</p>
               </div>
             </div>
 
