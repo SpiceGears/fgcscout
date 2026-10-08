@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberSeason } from "@/lib/seasonData";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -163,6 +164,7 @@ export default function MatchPage() {
         const loadedMatch = (await response.json()) as MatchDatum;
         if (!active) return;
         setMatch(loadedMatch);
+        if (loadedMatch.year) rememberSeason(loadedMatch.year);
         if (initial) {
           setVideoUrlInput(loadedMatch.data?.videoUrl ?? "");
           setVideoEnabled(false);

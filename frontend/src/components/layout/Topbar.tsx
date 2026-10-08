@@ -1,5 +1,6 @@
 "use client"
 
+import { SEASON_STORAGE_KEY } from "@/lib/seasonData";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SearchBar from "../ui/Search";
@@ -9,7 +10,10 @@ import MobileSidebar from "./MobileSidebar";
 export default function Topbar() {
   const router = useRouter();
   const handleSearch = (searchTerm: string) => {
-    if (searchTerm) router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
+    if (!searchTerm) return;
+    let year = "";
+    try { year = localStorage.getItem(SEASON_STORAGE_KEY) ?? ""; } catch { /* Use latest season. */ }
+    router.push(`/search?q=${encodeURIComponent(searchTerm)}${/^\d{4}$/.test(year) ? `&year=${year}` : ""}`);
   };
 
   return (

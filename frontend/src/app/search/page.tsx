@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberSeason, savedSeason, seasonTeams } from "@/lib/seasonData";
 import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { Search, Swords, Users } from "lucide-react";
@@ -20,6 +21,8 @@ function matchesWords(value: string, query: string) {
 function SearchResults() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const requestedYear = searchParams.get("year");
+  const [year, setYear] = useState<number | null>(null);
   const query = searchParams.get("q")?.trim() ?? "";
   const [input, setInput] = useState(query);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -30,40 +33,31 @@ function SearchResults() {
   useEffect(() => setInput(query), [query]);
 
   useEffect(() => {
-    async function loadSearchIndex() {
-      setLoading(true);
-      setError("");
+    let active = true;
+    async function loadSearchIndex(initial: boolean) {
+      if (initial) { setLoading(true); setError(""); setMatches([]); setTeams([]); }
       try {
-        const [teamsResponse, yearsResponse] = await Promise.all([
-          fetch(`${API_URL}/api/Teams`, { cache: "no-store" }),
-          fetch(`${API_URL}/api/GameData/years`, { cache: "no-store" }),
-        ]);
-        if (!teamsResponse.ok || !yearsResponse.ok) throw new Error("Could not load the search index.");
-
-        const [teamData, years] = await Promise.all([
-          teamsResponse.json() as Promise<Team[]>,
-          yearsResponse.json() as Promise<number[]>,
-        ]);
-        const matchResponses = await Promise.all(
-          years.map((year) => fetch(`${API_URL}/api/GameData/${year}`, { cache: "no-store" }))
-        );
-        const matchGroups = await Promise.all(
-          matchResponses.map(async (response, index) => {
-            if (!response.ok) return [];
-            const seasonMatches = await response.json() as MatchTableItem[];
-            return seasonMatches.map((match) => ({ ...match, year: years[index] }));
-          })
-        );
-        setTeams(teamData);
-        setMatches(matchGroups.flat());
+        const yearsResponse = await fetch(`${API_URL}/api/GameData/years`, { cache: "no-store" });
+        if (!yearsResponse.ok) throw new Error("Could not load seasons.");
+        const years = await yearsResponse.json() as number[];
+        const selected = savedSeason(years, requestedYear);
+        if (selected === null) { if (active) { setYear(null); setTeams([]); setMatches([]); } return; }
+        const response = await fetch(`${API_URL}/api/GameData/${selected}`, {cache:"no-store"});
+        if (!response.ok) throw new Error("Could not load the selected season.");
+        const seasonMatches = await response.json() as MatchTableItem[];
+        if (!active) return;
+        setYear(selected); rememberSeason(selected);
+        setTeams(seasonTeams(seasonMatches));
+        setMatches(seasonMatches.map(match => ({...match,year:selected})));
+        setError("");
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : "Could not load the search index.");
-      } finally {
-        setLoading(false);
-      }
+        if (active && initial) setError(reason instanceof Error ? reason.message : "Could not load the search index.");
+      } finally { if (active && initial) setLoading(false); }
     }
-    loadSearchIndex();
-  }, []);
+    void loadSearchIndex(true);
+    const timer = window.setInterval(() => void loadSearchIndex(false), 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [requestedYear]);
 
   const teamResults = useMemo(() => {
     if (!query) return [];
@@ -72,6 +66,7 @@ function SearchResults() {
       formatTeamName(team.country, team.countryCode),
       team.country,
       team.countryCode,
+      team.id,
     ].filter(Boolean).join(" "), query));
   }, [query, teams]);
 
@@ -95,14 +90,14 @@ function SearchResults() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextQuery = input.trim();
-    router.push(nextQuery ? `/search?q=${encodeURIComponent(nextQuery)}` : "/search");
+    router.push(`/search?q=${encodeURIComponent(nextQuery)}${year ? `&year=${year}` : ""}`);
   }
 
   return (
     <main className="page-shell">
       <div className="page-container max-w-6xl">
         <header className="border-b border-slate-800 pb-7">
-          <p className="eyebrow">Global search</p>
+          <p className="eyebrow">{year ? `Season ${year} search` : "Season search"}</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">Search FGC Scout</h1>
           <form onSubmit={submit} className="relative mt-5 max-w-2xl">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
