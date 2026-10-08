@@ -29,14 +29,20 @@ contains irreplaceable data.
 
 ## Production deployment
 
-Requirements: Docker Engine with Compose v2, a server reachable on ports 80 and
-443, and a DNS record pointing the chosen domain to that server.
+Requirements: Docker Engine with Compose v2 and an existing reverse proxy or
+Cloudflare Tunnel reaching the server on port 6080. The default host mappings are
+6080 → Caddy HTTP 80 and 6443 → Caddy HTTPS 443 (TCP/UDP). These retain the
+working deployment ports. `FGCSCOUT_HTTP_PORT` and `FGCSCOUT_HTTPS_PORT` in `.env`
+override them without editing Compose; existing `.env` files need no new entries.
 
 1. Copy `.env.example` to `.env`.
 2. Replace every placeholder with unique secrets. The admin key must be at least
    32 characters. Set the real operator name, address, privacy contact and hosting provider.
-3. Set `CADDY_SITE_ADDRESS` to the public domain and
-   `FGCSCOUT_FRONTEND_ORIGIN` to its `https://` URL. Keep
+3. For the existing HTTP tunnel/proxy route to 6080, keep its destination and
+   set `CADDY_SITE_ADDRESS=:80` to accept its forwarded Host header. For direct
+   HTTPS, set `CADDY_SITE_ADDRESS` to the public domain and configure upstream
+   routing/NAT to the published ports. Set `FGCSCOUT_FRONTEND_ORIGIN` to the
+   public `https://` URL. Keep
    `NEXT_PUBLIC_API_URL` empty for the recommended same-origin setup.
 4. Start and verify the stack:
 
@@ -45,10 +51,18 @@ docker compose --env-file .env -f docker-compose.prod.yml up --build -d --wait
 node scripts/smoke-test.mjs
 ```
 
-The public site is served by Caddy on ports 80/443. The backend and MongoDB are
+The public site is served by Caddy on host ports 6080/6443 by default. The backend and MongoDB are
 not published directly. Caddy obtains and renews TLS certificates automatically
 when a real domain is configured. For local production testing, set
-`CADDY_SITE_ADDRESS=http://localhost` and browse `http://localhost`.
+`CADDY_SITE_ADDRESS=http://localhost` and browse `http://localhost:6080`.
+
+The proxy healthcheck verifies Caddy’s local admin endpoint and connectivity to
+both frontend and backend. Use `up --wait` for deployment: a frontend left in
+`Created` cannot pass the startup gate. Healthchecks do not prove external tunnel
+routing; check the public domain after deployment. The smoke test uses port 6080
+by default, or `FGCSCOUT_HTTP_PORT`; set `FGCSCOUT_BASE_URL` for other origins.
+Do not add a host mapping for frontend port 3000: nginx already owns it on the
+current server. Do not restore the full stash to recover ports.
 
 Production uses a separate `fgcscout_prod_mongo_data` volume, so an unsecured
 development database is never silently reused. Import an existing season with

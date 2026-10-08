@@ -70,13 +70,13 @@ jobs:
 
       - name: Run smoke tests
         env:
-          FGCSCOUT_BASE_URL: http://localhost
+          FGCSCOUT_BASE_URL: http://localhost:6080
           FGCSCOUT_ADMIN_API_KEY: ci-admin-key-with-more-than-32-characters
         run: node scripts/smoke-test.mjs
 
       - name: Test video administration against isolated database
         env:
-          FGCSCOUT_BASE_URL: http://localhost
+          FGCSCOUT_BASE_URL: http://localhost:6080
           FGCSCOUT_RUN_VIDEO_TESTS: "1"
         run: node scripts/video-admin-test.mjs
 
@@ -89,7 +89,7 @@ jobs:
 
       - name: Test 2026 schedule and result updates
         env:
-          FGCSCOUT_BASE_URL: http://localhost
+          FGCSCOUT_BASE_URL: http://localhost:6080
           FGCSCOUT_RUN_VIDEO_TESTS: "1"
         run: node scripts/season-2026-test.mjs
 

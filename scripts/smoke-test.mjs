@@ -1,4 +1,4 @@
-const baseUrl = (process.env.FGCSCOUT_BASE_URL ?? "http://localhost").replace(/\/$/, "");
+const baseUrl = (process.env.FGCSCOUT_BASE_URL ?? `http://localhost:${process.env.FGCSCOUT_HTTP_PORT ?? "6080"}`).replace(/\/$/, "");
 const adminKey = process.env.FGCSCOUT_ADMIN_API_KEY;
 
 async function request(path, options = {}) {
