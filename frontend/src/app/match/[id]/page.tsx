@@ -284,7 +284,7 @@ export default function MatchPage() {
           </div>
         </header>
 
-        <p className="mt-3 text-xs text-slate-500">Results refresh automatically every 30 seconds after the server synchronizes the official API.</p>
+
         {isWildfire && <WildfireOverview details={details} played={played} />}
         {isEcoEquilibrium && played && <FieldVisualization details={details} redTeams={redTeams} blueTeams={blueTeams} />}
 

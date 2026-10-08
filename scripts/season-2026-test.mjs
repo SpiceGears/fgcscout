@@ -14,6 +14,7 @@ async function api(path, method = 'GET', body, expectedStatus = 200) {
 assert.equal((await api('/api/GameData/2026')).length, 0, 'Existing season; refusing to overwrite.');
 assert(!(await api('/api/admin/seasons')).some(season => season.year === 2026), 'Existing season configuration; refusing to overwrite.');
 const source = JSON.parse(readFileSync('data-2026.json', 'utf8'));
+source.rankings = JSON.parse(readFileSync('scripts/fixtures/rankings-2026.json','utf8'));
 try {
   await api('/api/admin/importSeason?replaceExisting=false', 'POST', source);
   // Exercise the deployed Compose allowlist, not just the appsettings default.
@@ -22,6 +23,8 @@ try {
   assert.equal(configured.sourceUrl, config.sourceUrl);
   await api('/api/admin/seasons/2026', 'PUT', {...config,sourceUrl:'http://api.first.global/v1'}, 400);
   await api('/api/admin/seasons/2026', 'PUT', {...config,sourceUrl:'https://api.first.global.evil.example/v1'}, 400);
+  const official = await api('/api/Seasons/2026/rankings');
+  assert.deepEqual(official.rankings, source.rankings);
   const stored = await api('/api/GameData/2026');
   assert.equal(stored.length, 342);
   assert.equal(stored.filter(match => !match.data.played).length, 340);
@@ -33,6 +36,9 @@ try {
   Object.assign(update, {played:true,redScore:131,blueScore:97,actualStartTime:'2026-10-08T11:15:00+09:00',details:source.matches.find(match => match.played).details});
   update.details = {...update.details, id:update.id, tournamentKey:update.tournamentKey};
   await api('/api/admin/importSeason?replaceExisting=false', 'POST', {matches:[update]});
+  assert.deepEqual((await api('/api/Seasons/2026/rankings')).rankings,source.rankings);
+  const exported = await api('/api/admin/seasons/2026/export');
+  assert.deepEqual(exported.rankings,source.rankings);
   const changed = await api(`/api/GameData/match/${scheduled.id}`);
   assert.equal(changed.id, scheduled.id);
   assert.equal(changed.data.played, true);

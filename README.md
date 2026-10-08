@@ -212,3 +212,14 @@ Archive imports and live reconciliation accept a unique match number without
 requiring a field. Optional event/tournament keys disambiguate overlapping numbers.
 Ambiguous numbers are never attached automatically. Fields still identify the
 configured stream channels and appear in the match metadata provided by the API.
+
+## Official rankings for 2026
+
+The importer and API synchronization preserve the upstream `rankings` array in
+a season-specific snapshot. `/api/Seasons/2026/rankings` exposes its official
+rank, ranking score, highest score, climb points and played count. The 2026
+standings use those values directly and do not calculate positions from W-L-T.
+A season sync is required once after upgrading to populate an existing season.
+Exports include rankings; match-only updates preserve the last official snapshot.
+Replacing a season without rankings clears that snapshot. Deleting a season
+removes it. Empty/unavailable standings never fall back to an invented ranking.

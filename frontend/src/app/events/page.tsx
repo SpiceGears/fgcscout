@@ -1,5 +1,6 @@
 "use client";
 
+import { officialRankingRows, type OfficialRanking } from "@/lib/officialRankings";
 import Link from "next/link";
 import { rememberSeason, savedSeason, isPlayed } from "@/lib/seasonData";
 import { useEffect, useMemo, useState } from "react";
@@ -30,6 +31,8 @@ type EventMatch = {
 };
 
 type Ranking = {
+  rank?: number;
+  climbPoints?: number;
   key: string;
   country: string;
   countryRaw?: string;
@@ -132,9 +135,7 @@ function ResultsTable({ matches }: { matches: EventMatch[] }) {
                     <p className="mt-1 text-xs text-gray-500">Field {match.data.field ?? "—"}</p>
                   </td>
                   <td className="px-4 py-3 text-center text-lg font-bold">
-                    <span className={redScore > blueScore ? "text-red-400" : "text-gray-300"}>{redScore}</span>
-                    <span className="mx-2 text-gray-600">–</span>
-                    <span className={blueScore > redScore ? "text-sky-400" : "text-gray-300"}>{blueScore}</span>
+                    {isPlayed(match) ? <><span className={redScore > blueScore ? "text-red-400" : "text-gray-300"}>{redScore}</span><span className="mx-2 text-gray-600">–</span><span className={blueScore > redScore ? "text-sky-400" : "text-gray-300"}>{blueScore}</span></> : <span className="text-sm font-normal text-slate-400">Scheduled</span>}
                   </td>
                   {red.map((participant) => <td key={`${participant.station}-${participant.teamKey}`} className="bg-red-950/45"><TeamCell participant={participant} /></td>)}
                   {Array.from({ length: Math.max(0, 3 - red.length) }).map((_, emptyIndex) => <td key={`red-empty-${emptyIndex}`} className="bg-red-950/45" />)}
@@ -241,6 +242,8 @@ function buildRankings(matches: EventMatch[], year: number | null) {
 export default function EventsPage() {
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState<number | null>(null);
+  const [official, setOfficial] = useState<OfficialRanking[]>([]);
+  const [rankingError, setRankingError] = useState("");
   const [matches, setMatches] = useState<EventMatch[]>([]);
   const [tab, setTab] = useState<Tab>("Results");
   const [loading, setLoading] = useState(true);
@@ -260,11 +263,22 @@ export default function EventsPage() {
     if (year === null) return;
     let active = true;
     async function loadMatches(initial: boolean) {
-      if (initial) setLoading(true);
+      if (initial) { setLoading(true); setOfficial([]); setRankingError(""); }
       try {
-        const response = await fetch(`${API_URL}/api/GameData/${year}`, { cache: "no-store" });
+        const [response, rankingResponse] = await Promise.all([
+          fetch(`${API_URL}/api/GameData/${year}`, {cache:"no-store"}),
+          year === 2026 ? fetch(`${API_URL}/api/Seasons/${year}/rankings`, {cache:"no-store"}) : Promise.resolve(null),
+        ]);
+        if (year === 2026 && active) {
+          if (rankingResponse?.ok) {
+            const payload = await rankingResponse.json();
+            setOfficial(Array.isArray(payload.rankings) ? payload.rankings : []); setRankingError("");
+          } else { setOfficial([]); setRankingError("Official rankings are unavailable. Sync the season to load them."); }
+        }
         const data = response.ok ? await response.json() as EventMatch[] : [];
         if (active) setMatches(data);
+      } catch {
+        if (active && year === 2026) { setOfficial([]); setRankingError("Could not load official rankings. Try again after the next sync."); }
       } finally {
         if (active && initial) setLoading(false);
       }
@@ -277,7 +291,9 @@ export default function EventsPage() {
     };
   }, [year]);
 
-  const rankings = useMemo(() => buildRankings(matches, year), [matches, year]);
+  const rankings: Ranking[] = useMemo(() => year === 2026 ? officialRankingRows(official).map(row => ({
+    ...row,country:formatTeamName(row.countryRaw,row.countryCode),wins:0,losses:0,ties:0,pointsFor:0,pointsAgainst:0,protectionPoints:0,
+  })) : buildRankings(matches, year), [matches, year, official]);
   const teams = useMemo(() => {
     const directory = new Map<string, { key: string; name: string; slug: string }>();
     matches.forEach((match) => match.data.participants?.forEach((participant) => {
@@ -321,8 +337,8 @@ export default function EventsPage() {
           </label>
         </header>
 
-        <nav className="mt-6 flex gap-1 overflow-x-auto rounded-xl border border-gray-800 bg-gray-900 p-1">
-          {TABS.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition ${tab === item ? "bg-sky-600 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}>{item}</button>)}
+        <nav className="mt-6 flex gap-5 overflow-x-auto border-b border-slate-800">
+          {TABS.map((item) => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium ${tab === item ? "border-sky-400 text-sky-400" : "border-transparent text-slate-400 hover:text-white"}`}>{item}</button>)}
         </nav>
 
         <section className="mt-6">
@@ -330,20 +346,25 @@ export default function EventsPage() {
           {!loading && tab === "Results" && <ResultsTable matches={matches} />}
 
           {!loading && tab === "Rankings" && (
-            <div className="panel overflow-x-auto">
-              <div className="flex flex-col gap-3 border-b border-gray-800 p-5 sm:flex-row sm:items-center sm:justify-between">
-                <div><h2 className="text-xl font-bold">Team rankings</h2><p className="mt-1 text-sm text-gray-500">{year === 2025 ? "Ranking Score is the average of each team's best 11 scores from 12 Ranking Matches." : "Calculated from played match results."}</p></div>
-                {year === 2025 && <a href="https://first.global/archive/fgc-2025/#rankings" target="_blank" rel="noreferrer" className="flex shrink-0 items-center gap-2 text-sm font-semibold text-sky-400 transition hover:text-sky-300">Official standings <ExternalLink className="h-4 w-4" /></a>}
+            <div className="overflow-x-auto">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-xl font-semibold">Team rankings</h2>
+                {year === 2026 && <a href="https://results.first.global/" target="_blank" rel="noreferrer" className="text-sm text-sky-400 hover:underline">Official standings</a>}
               </div>
-              <table className="w-full min-w-[700px] text-left">
-                <thead className="bg-slate-800/60 text-xs uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">Rank</th><th className="px-4 py-3">Team</th><th className="px-4 py-3 text-center">Played</th>
-                    {year === 2025 ? <><th className="px-4 py-3 text-center">Ranking Score</th><th className="px-4 py-3 text-center">Highest Points</th><th className="px-4 py-3 text-center">Protection Points</th></> : <><th className="px-4 py-3 text-center">W-L-T</th><th className="px-4 py-3 text-center">Ranking score</th><th className="px-4 py-3 text-center">Point diff.</th></>}
-                  </tr>
-                </thead>
-                <tbody>{rankings.map((ranking, index) => <tr key={ranking.key} className="border-t border-gray-800 transition hover:bg-gray-800/60"><td className="px-4 py-3 font-mono text-sm font-bold text-sky-400">{String(index + 1).padStart(2, "0")}</td><td className="px-4 py-3 font-semibold"><Link href={`/team/${formatTeamSlug(ranking.countryRaw, ranking.countryCode, ranking.key)}`} className="transition hover:text-sky-300">{ranking.country}</Link></td><td className="px-4 py-3 text-center">{ranking.played}</td>{year === 2025 ? <><td className="px-4 py-3 text-center font-mono font-bold">{ranking.rankingScore.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td className="px-4 py-3 text-center">{ranking.highestPoints}</td><td className="px-4 py-3 text-center">{ranking.protectionPoints.toLocaleString("en-US", { maximumFractionDigits: 3 })}</td></> : <><td className="px-4 py-3 text-center">{ranking.wins}-{ranking.losses}-{ranking.ties}</td><td className="px-4 py-3 text-center font-bold">{ranking.wins * 3 + ranking.ties}</td><td className="px-4 py-3 text-center">{ranking.pointsFor - ranking.pointsAgainst}</td></>}</tr>)}</tbody>
-              </table>
+              {year === 2026 && rankings.length === 0 ? <p className="py-6 text-sm text-slate-400">{rankingError || "No official rankings published yet. Sync the season to load the latest standings."}</p> :
+              <table className="w-full min-w-[700px] text-left text-sm">
+                <thead className="text-slate-400"><tr>
+                  <th className="px-3 py-3 font-medium">Rank</th><th className="px-3 py-3 font-medium">Team</th>
+                  {year === 2025 || year === 2026 ? <><th className="px-3 py-3 text-right font-medium">Ranking Score</th><th className="px-3 py-3 text-right font-medium">Highest Points</th><th className="px-3 py-3 text-right font-medium">{year === 2026 ? "Climb Points" : "Protection Points"}</th></> : <><th className="px-3 py-3 text-right">W-L-T</th><th className="px-3 py-3 text-right">Ranking score</th><th className="px-3 py-3 text-right">Point diff.</th></>}
+                  <th className="px-3 py-3 text-right font-medium">Played</th>
+                </tr></thead>
+                <tbody>{rankings.map((ranking,index) => <tr key={ranking.key} className="border-t border-slate-800/60">
+                  <td className="px-3 py-3 text-slate-400">{year === 2026 ? ranking.rank || "—" : index + 1}</td>
+                  <td className="px-3 py-3"><Link href={`/team/${formatTeamSlug(ranking.countryRaw,ranking.countryCode,ranking.key)}`} className="text-sky-400 hover:underline">{ranking.country}</Link></td>
+                  {year === 2025 || year === 2026 ? <><td className="px-3 py-3 text-right tabular-nums">{ranking.rankingScore.toLocaleString("en-US",{maximumFractionDigits:3})}</td><td className="px-3 py-3 text-right tabular-nums">{ranking.highestPoints}</td><td className="px-3 py-3 text-right tabular-nums">{(year === 2026 ? ranking.climbPoints ?? 0 : ranking.protectionPoints).toLocaleString("en-US",{maximumFractionDigits:3})}</td></> : <><td className="px-3 py-3 text-right">{ranking.wins}-{ranking.losses}-{ranking.ties}</td><td className="px-3 py-3 text-right">{ranking.wins*3+ranking.ties}</td><td className="px-3 py-3 text-right">{ranking.pointsFor-ranking.pointsAgainst}</td></>}
+                  <td className="px-3 py-3 text-right tabular-nums">{ranking.played}</td>
+                </tr>)}</tbody>
+              </table>}
             </div>
           )}
 

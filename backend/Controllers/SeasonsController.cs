@@ -11,6 +11,14 @@ public class SeasonsController : ControllerBase
 
     public SeasonsController(DBService db) => _db = db;
 
+    [HttpGet("{year:int}/rankings")]
+    public async Task<IActionResult> GetRankings(uint year)
+    {
+        var stored = await _db.GetOfficialRankingsAsync(year);
+        return Ok(new { year, updatedAt = stored?.UpdatedAt,
+            rankings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(stored?.Json ?? "[]") });
+    }
+
     [HttpGet]
     public async Task<IActionResult> Get()
     {

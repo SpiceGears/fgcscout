@@ -59,6 +59,7 @@ public class AdminController : ControllerBase
 
         await _db.RemoveSeasonConfigurationAsync(year);
         await _db.RemoveLiveVideoConfigurationAsync(year);
+        await _db.RemoveOfficialRankingsAsync(year);
 
         return Ok(new { year, deletedMatches });
     }
@@ -72,7 +73,9 @@ public class AdminController : ControllerBase
 
         var payload = new
         {
-            matches = matches.Select(match => ConvertBsonToClr(match.Data)).ToList()
+            matches = matches.Select(match => ConvertBsonToClr(match.Data)).ToList(),
+            rankings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(
+                (await _db.GetOfficialRankingsAsync(year))?.Json ?? "[]")
         };
         var json = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             payload,
