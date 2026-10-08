@@ -56,8 +56,7 @@ export default function WildfireMatchDetails(props: Props) {
     ["Official total score", v(props.redScore ?? null), v(props.blueScore ?? null)],
   ];
   return <section className="mt-7">
-    <h2 className="text-2xl font-semibold">{played ? "Detailed Results" : "Scoring guide · results pending"}</h2>
-    {!played && <p className="mt-2 text-sm text-slate-400">This match has not been played. Teams and schedule are available; scores and achievements will appear when the official results are published.</p>}
+    <h2 className="text-2xl font-semibold">{played ? "Detailed Results" : "Results pending"}</h2>
     <div className="mt-3 overflow-hidden">
       <div className="flex items-center justify-center gap-2 bg-orange-950/40 px-4 py-3 font-semibold text-orange-200"><Users className="h-4 w-4" />Global Alliance · shared by both alliances</div>
       {globalRows.map(([label, value]) => <div key={label} className="flex justify-between gap-4 border-t border-slate-800 px-4 py-3 text-sm"><span className="text-slate-300">{label}</span><strong className="font-mono text-orange-200">{v(value)}</strong></div>)}
