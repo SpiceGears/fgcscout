@@ -82,7 +82,7 @@ function toYouTubeEmbed(url?: string, startTimestamp?: number, endTimestamp?: nu
     const parsed = new URL(url);
     let videoId = "";
     if (parsed.hostname === "youtu.be" || parsed.hostname === "www.youtu.be") videoId = parsed.pathname.slice(1);
-    else if (parsed.pathname.startsWith("/shorts/") || parsed.pathname.startsWith("/embed/")) videoId = parsed.pathname.split("/")[2] ?? "";
+    else if (parsed.pathname.startsWith("/shorts/") || parsed.pathname.startsWith("/embed/") || parsed.pathname.startsWith("/live/")) videoId = parsed.pathname.split("/")[2] ?? "";
     else videoId = parsed.searchParams.get("v") ?? "";
     if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) return null;
     const embed = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
@@ -244,6 +244,13 @@ export default function MatchPage() {
   const played = data.played !== false;
   const isWildfire = match.year === 2026;
   const videoEmbed = toYouTubeEmbed(data.videoUrl, data.videoStartTimestamp, data.videoEndTimestamp);
+  const videoWatch = videoEmbed ? (() => {
+    const embed = new URL(videoEmbed);
+    const watch = new URL("https://www.youtube.com/watch");
+    watch.searchParams.set("v", embed.pathname.split("/")[2]);
+    watch.searchParams.set("t", `${embed.searchParams.get("start") ?? "0"}s`);
+    return watch.toString();
+  })() : null;
   const barriersRed = detailNumber(details, "barriersInRedMitigator");
   const barriersBlue = detailNumber(details, "barriersInBlueMitigator");
   const barrierPoints = barriersRed + barriersBlue;
@@ -389,7 +396,7 @@ export default function MatchPage() {
                   <button type="button" onClick={() => setVideoEnabled(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500">
                     <Play className="h-4 w-4 fill-current" />Load video
                   </button>
-                  {data.videoUrl && <a href={data.videoUrl} target="_blank" rel="noreferrer" className="ml-3 mt-4 inline-flex items-center gap-1.5 text-sm text-sky-400 hover:underline"><ExternalLink className="h-4 w-4" />Open on YouTube</a>}
+                  {videoWatch && <a href={videoWatch} target="_blank" rel="noreferrer" className="ml-3 mt-4 inline-flex items-center gap-1.5 text-sm text-sky-400 hover:underline"><ExternalLink className="h-4 w-4" />Open on YouTube</a>}
                 </div>
               </div>
             ) : (
