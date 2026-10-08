@@ -135,9 +135,7 @@ function ResultsTable({ matches }: { matches: EventMatch[] }) {
                     <p className="mt-1 text-xs text-gray-500">Field {match.data.field ?? "—"}</p>
                   </td>
                   <td className="px-4 py-3 text-center text-lg font-bold">
-                    <span className={redScore > blueScore ? "text-red-400" : "text-gray-300"}>{redScore}</span>
-                    <span className="mx-2 text-gray-600">–</span>
-                    <span className={blueScore > redScore ? "text-sky-400" : "text-gray-300"}>{blueScore}</span>
+                    {isPlayed(match) ? <><span className={redScore > blueScore ? "text-red-400" : "text-gray-300"}>{redScore}</span><span className="mx-2 text-gray-600">–</span><span className={blueScore > redScore ? "text-sky-400" : "text-gray-300"}>{blueScore}</span></> : <span className="text-sm font-normal text-slate-400">Scheduled</span>}
                   </td>
                   {red.map((participant) => <td key={`${participant.station}-${participant.teamKey}`} className="bg-red-950/45"><TeamCell participant={participant} /></td>)}
                   {Array.from({ length: Math.max(0, 3 - red.length) }).map((_, emptyIndex) => <td key={`red-empty-${emptyIndex}`} className="bg-red-950/45" />)}
