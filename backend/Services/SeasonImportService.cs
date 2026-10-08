@@ -44,6 +44,19 @@ public sealed class SeasonImportService
         if (expectedYear.HasValue && year != expectedYear.Value)
             throw new InvalidOperationException($"The source contains season {year}, but season {expectedYear.Value} was configured.");
 
+        var root = payload;
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var wrapped) && wrapped.ValueKind == JsonValueKind.Object) root = wrapped;
+        string? rankingsJson = null;
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("rankings", out var rankings))
+        {
+            if (rankings.ValueKind != JsonValueKind.Array || rankings.GetArrayLength() > 10000)
+                throw new InvalidOperationException("Expected an official rankings array with at most 10,000 teams.");
+            foreach (var row in rankings.EnumerateArray())
+                if (row.ValueKind != JsonValueKind.Object || TryGetYear(row) is uint rankingYear && rankingYear != year)
+                    throw new InvalidOperationException("Rankings must belong to the imported season.");
+            rankingsJson = rankings.GetRawText();
+        }
+
         var gameData = new List<GameData>();
         var teams = new Dictionary<string, Team>(StringComparer.Ordinal);
         foreach (var match in matches)
@@ -77,6 +90,9 @@ public sealed class SeasonImportService
             inserted = result.Inserted;
             updated = result.Updated;
         }
+
+        if (rankingsJson is not null) await _db.SaveOfficialRankingsAsync(year, rankingsJson);
+        else if (replaceExisting) await _db.RemoveOfficialRankingsAsync(year);
 
         if (teams.Count > 0) await _db.UpsertTeamsAsync(teams.Values);
 

@@ -29,6 +29,15 @@ public class DBService
         _seasonConfigurations = _database.GetCollection<SeasonConfiguration>("SeasonConfigurations");
     }
 
+    private IMongoCollection<OfficialRankings> Rankings => _database.GetCollection<OfficialRankings>("OfficialRankings");
+    public async Task<OfficialRankings?> GetOfficialRankingsAsync(uint year) =>
+        await Rankings.Find(item => item.Year == year).FirstOrDefaultAsync();
+    public async Task SaveOfficialRankingsAsync(uint year, string json) =>
+        await Rankings.ReplaceOneAsync(item => item.Year == year,
+            new OfficialRankings { Year = year, Json = json, UpdatedAt = DateTime.UtcNow },
+            new ReplaceOptions { IsUpsert = true });
+    public async Task RemoveOfficialRankingsAsync(uint year) => await Rankings.DeleteOneAsync(item => item.Year == year);
+
     private IMongoCollection<LiveVideoConfiguration> LiveVideos => _database.GetCollection<LiveVideoConfiguration>("LiveVideoConfigurations");
 
     public async Task<List<LiveVideoConfiguration>> GetLiveVideoConfigurationsAsync() =>
