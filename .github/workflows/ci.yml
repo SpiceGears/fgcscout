@@ -45,6 +45,9 @@ jobs:
       - name: Test official 2026 ranking fidelity
         run: node scripts/official-ranking-test.mjs
 
+      - name: Test live match player seeking
+        run: node scripts/match-video-player-test.mjs
+
       - name: Test 2026 scoring against supplied API data
         run: node scripts/match-2026-test.mjs
 

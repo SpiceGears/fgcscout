@@ -13,7 +13,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  `script-src ${scriptSources}`,
+  `script-src ${scriptSources} https://www.youtube.com/iframe_api https://www.youtube.com/s/player/`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://i.ytimg.com",
   "font-src 'self' data:",

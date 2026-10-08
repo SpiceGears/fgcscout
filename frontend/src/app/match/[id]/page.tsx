@@ -9,6 +9,7 @@ import { formatTeamName, formatTeamSlug } from "@/lib/country";
 import FieldVisualization from "@/components/match/FieldVisualization";
 import WildfireMatchDetails, { WildfireOverview } from "@/components/match/WildfireMatchDetails";
 import GenericMatchDetails from "@/components/match/GenericMatchDetails";
+import MatchVideo from "@/components/match/MatchVideo";
 
 type Participant = {
   station?: number;
@@ -248,7 +249,9 @@ export default function MatchPage() {
     const embed = new URL(videoEmbed);
     const watch = new URL("https://www.youtube.com/watch");
     watch.searchParams.set("v", embed.pathname.split("/")[2]);
-    watch.searchParams.set("t", `${embed.searchParams.get("start") ?? "0"}s`);
+    const start = embed.searchParams.get("start") ?? "0";
+    watch.searchParams.set("t", start);
+    watch.searchParams.set("start", start);
     return watch.toString();
   })() : null;
   const barriersRed = detailNumber(details, "barriersInRedMitigator");
@@ -385,7 +388,7 @@ export default function MatchPage() {
             </div>
             {videoEmbed ? videoEnabled ? (
               <div className="mt-3 overflow-hidden rounded-xl border border-gray-700 bg-black shadow-2xl">
-                <iframe src={videoEmbed} title={`${title} video`} className="aspect-video w-full" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
+                <MatchVideo src={videoEmbed} title={`${title} video`} />
               </div>
             ) : (
               <div className="mt-3 flex aspect-video items-center justify-center rounded-xl border border-gray-700 bg-gray-900 px-6 text-center">
