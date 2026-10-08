@@ -11,7 +11,7 @@ public class SeasonConfiguration
     public string Name { get; set; } = string.Empty;
 
     [BsonElement("sourceUrl")]
-    public string SourceUrl { get; set; } = "https://results.first.global/";
+    public string SourceUrl { get; set; } = "https://api.first.global/v1";
 
     [BsonElement("syncEnabled")]
     public bool SyncEnabled { get; set; }

@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs';
 const base = (process.env.FGCSCOUT_BASE_URL ?? 'http://localhost').replace(/\/$/, '');
 const key = process.env.FGCSCOUT_ADMIN_API_KEY;
 if (process.env.FGCSCOUT_RUN_VIDEO_TESTS !== '1' || !key) throw new Error('Use only the isolated CI database.');
-async function api(path, method = 'GET', body) {
+async function api(path, method = 'GET', body, expectedStatus = 200) {
   for (let attempt = 0; attempt < 4; attempt++) {
     const response = await fetch(base + path, {method, headers:{'Content-Type':'application/json','X-Admin-Key':key}, body:body === undefined ? undefined : JSON.stringify(body)});
     if (response.status === 429 && attempt < 3) { await new Promise(resolve => setTimeout(resolve, 20000)); continue; }
-    assert.equal(response.status, 200, await response.clone().text());
+    assert.equal(response.status, expectedStatus, await response.clone().text());
     return response.json();
   }
 }
@@ -16,6 +16,12 @@ assert(!(await api('/api/admin/seasons')).some(season => season.year === 2026), 
 const source = JSON.parse(readFileSync('data-2026.json', 'utf8'));
 try {
   await api('/api/admin/importSeason?replaceExisting=false', 'POST', source);
+  // Exercise the deployed Compose allowlist, not just the appsettings default.
+  const config = {name:'FIRST Global Challenge 2026',sourceUrl:'https://api.first.global/v1',syncEnabled:false,syncIntervalMinutes:1};
+  const configured = await api('/api/admin/seasons/2026', 'PUT', config);
+  assert.equal(configured.sourceUrl, config.sourceUrl);
+  await api('/api/admin/seasons/2026', 'PUT', {...config,sourceUrl:'http://api.first.global/v1'}, 400);
+  await api('/api/admin/seasons/2026', 'PUT', {...config,sourceUrl:'https://api.first.global.evil.example/v1'}, 400);
   const stored = await api('/api/GameData/2026');
   assert.equal(stored.length, 342);
   assert.equal(stored.filter(match => !match.data.played).length, 340);
