@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
@@ -64,6 +65,103 @@ class LiveTests(unittest.TestCase):
         self.assertEqual(len(worker.matches_for(detection,rows)),1)
         self.assertEqual(len(worker.matches_for(dict(detection,field=2),rows)),1)
         self.assertEqual(len(worker.matches_for(detection,rows+[rows[0]])),2)
+
+    def test_discontinuity_uses_fresh_utc_instead_of_stalling(self):
+        origin=worker.utc('2026-10-09T00:00:00Z')
+        for tags in ('#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:02:00Z',
+                     '#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:02:00Z\n#EXT-X-DISCONTINUITY'):
+            text=f'#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:20\n{tags}\n#EXTINF:5,\na.ts\n'
+            segment=worker.playlist(text,'https://example.test/live.m3u8')['segments'][0]
+            self.assertTrue(segment['pdt_explicit'])
+            self.assertEqual(worker.segment_start(segment,{}, {'next_sequence':20,'next_timestamp':100},origin),120)
+
+    def test_discontinuity_never_reuses_extrapolated_time(self):
+        text='#EXTM3U\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:00:00Z\n#EXTINF:5,\na.ts\n#EXT-X-DISCONTINUITY\n#EXTINF:5,\nb.ts\n#EXTINF:5,\nc.ts\n'
+        segments=worker.playlist(text,'https://example.test/live.m3u8')['segments']
+        self.assertIsNone(segments[1]['pdt'])
+        self.assertIsNone(segments[2]['pdt'])
+        with self.assertRaisesRegex(ValueError,'no fresh UTC'):
+            worker.segment_start(segments[1],{}, {'next_sequence':1,'next_timestamp':5},worker.utc('2026-10-09T00:00:00Z'))
+        self.assertEqual(worker.segment_start(segments[1],{'anchor_sequence':1,'anchor_timestamp':50},{},None),50)
+
+    def test_saved_checkpoint_recovers_match_after_hls_discontinuity(self):
+        origin=worker.utc('2026-10-09T00:00:00Z')
+        text='#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:21\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:01:40Z\n#EXTINF:155,\na.ts\n#EXT-X-ENDLIST\n'
+        data=worker.playlist(text,'https://example.test/live.m3u8')
+        for field in range(1,6):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temp:
+                store=worker.Store(Path(temp)/'state.sqlite3')
+                cfg=dict(self.cfg,field=field)
+                key=worker.stream_identity(cfg)
+                store.checkpoint(key,{'last_sequence':20,'last_video_timestamp':97,'next_sequence':21,'next_timestamp':100,
+                                      'status':'retrying','error':'HLS discontinuity: recalibrate timeline before continuing'})
+                samples=[{'t':t,'remaining':r,'number':1,'field':field} for t,r in [(100,150),(102,148),(104,146),(106,144),(250,0)]]
+                with patch.object(worker,'resolve',return_value=('https://example.test/live.m3u8',origin)), \
+                     patch.object(worker,'media_playlist',return_value=data), \
+                     patch.object(worker,'http',return_value=(b'segment','https://example.test/a.ts')), \
+                     patch.object(worker,'observations',return_value=iter(samples)):
+                    worker.stream_worker(cfg,store,threading.Event())
+                self.assertEqual(store.stream(key)['status'],'stream_ended')
+                self.assertNotIn('error',store.stream(key))
+                record=store.pending()[0][0]
+                self.assertEqual(record['status'],'complete')
+                self.assertEqual(record['start_timestamp'],100)
+                self.assertEqual(record['end_timestamp'],250)
+                store.db.close()
+
+    def test_new_worker_checks_entire_available_anchored_window(self):
+        origin=worker.utc('2026-10-09T00:00:00Z')
+        segments=[{'seq':n,'pdt':origin+n*5,'pdt_explicit':True,'discontinuity':False,
+                   'duration':5,'url':f'https://example.test/{n}.ts','init':None} for n in range(30)]
+        for restarted in (False,True):
+            with self.subTest(restarted=restarted), tempfile.TemporaryDirectory() as temp:
+                store=worker.Store(Path(temp)/'state.sqlite3')
+                if restarted:
+                    store.checkpoint(worker.stream_identity(self.cfg),{'last_sequence':1,'last_video_timestamp':8,'next_sequence':2,'next_timestamp':10})
+                processed=[]
+                def observe(raw,cfg,base):
+                    processed.append(base)
+                    return iter([])
+                with patch.object(worker,'resolve',return_value=('https://example.test/live.m3u8',origin)), \
+                     patch.object(worker,'media_playlist',return_value={'segments':segments,'ended':True}), \
+                     patch.object(worker,'http',return_value=(b'segment','https://example.test/a.ts')), \
+                     patch.object(worker,'observations',side_effect=observe):
+                    worker.stream_worker(self.cfg,store,threading.Event())
+                self.assertEqual(processed,list(range(10 if restarted else 0,150,5)))
+                store.db.close()
+
+    def test_actual_day2_manifests_resume_from_saved_startup_checkpoints(self):
+        # Live manifest tags captured 2026-10-09, with media URLs anonymized.
+        fixtures=json.loads((Path(__file__).parent/'fixtures/day2-startup-hls.json').read_text())
+        for fixture in fixtures:
+            for restart in (False,True):
+                with self.subTest(field=fixture['field'],restart=restart), tempfile.TemporaryDirectory() as temp:
+                    data=worker.playlist(fixture['playlist'],'https://example.test/live.m3u8')
+                    data['ended']=True
+                    boundary=data['segments'][-1]
+                    self.assertTrue(boundary['discontinuity'])
+                    self.assertLess(data['segments'][0]['pdt'],fixture['origin'])
+                    expected=boundary['pdt']-fixture['origin']
+                    self.assertGreater(expected,90)
+                    self.assertLess(expected,120)
+                    cfg=dict(self.cfg,field=fixture['field'])
+                    store=worker.Store(Path(temp)/'state.sqlite3')
+                    if restart:
+                        store.checkpoint(worker.stream_identity(cfg),{'last_sequence':boundary['seq']-1,'last_video_timestamp':expected-3,
+                                          'next_sequence':boundary['seq'],'next_timestamp':expected,'status':'retrying'})
+                    processed=[]
+                    def observe(raw,cfg,base):
+                        processed.append(base)
+                        return iter([])
+                    with patch.object(worker,'resolve',return_value=('https://example.test/live.m3u8',fixture['origin'])), \
+                         patch.object(worker,'media_playlist',return_value=data), \
+                         patch.object(worker,'http',return_value=(b'segment','https://example.test/a.ts')), \
+                         patch.object(worker,'observations',side_effect=observe):
+                        worker.stream_worker(cfg,store,threading.Event())
+                    self.assertAlmostEqual(processed[-1],expected)
+                    self.assertTrue(all(value>=0 for value in processed))
+                    self.assertEqual(store.stream(worker.stream_identity(cfg))['status'],'stream_ended')
+                    store.db.close()
 
     def test_number_without_overlay_field(self):
         detector = worker.Detector(self.cfg, {})
