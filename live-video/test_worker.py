@@ -130,6 +130,39 @@ class LiveTests(unittest.TestCase):
                 self.assertEqual(processed,list(range(10 if restarted else 0,150,5)))
                 store.db.close()
 
+    def test_actual_day2_manifests_resume_from_saved_startup_checkpoints(self):
+        # Live manifest tags captured 2026-10-09, with media URLs anonymized.
+        fixtures=json.loads((Path(__file__).parent/'fixtures/day2-startup-hls.json').read_text())
+        for fixture in fixtures:
+            for restart in (False,True):
+                with self.subTest(field=fixture['field'],restart=restart), tempfile.TemporaryDirectory() as temp:
+                    data=worker.playlist(fixture['playlist'],'https://example.test/live.m3u8')
+                    data['ended']=True
+                    boundary=data['segments'][-1]
+                    self.assertTrue(boundary['discontinuity'])
+                    self.assertLess(data['segments'][0]['pdt'],fixture['origin'])
+                    expected=boundary['pdt']-fixture['origin']
+                    self.assertGreater(expected,90)
+                    self.assertLess(expected,120)
+                    cfg=dict(self.cfg,field=fixture['field'])
+                    store=worker.Store(Path(temp)/'state.sqlite3')
+                    if restart:
+                        store.checkpoint(worker.stream_identity(cfg),{'last_sequence':boundary['seq']-1,'last_video_timestamp':expected-3,
+                                          'next_sequence':boundary['seq'],'next_timestamp':expected,'status':'retrying'})
+                    processed=[]
+                    def observe(raw,cfg,base):
+                        processed.append(base)
+                        return iter([])
+                    with patch.object(worker,'resolve',return_value=('https://example.test/live.m3u8',fixture['origin'])), \
+                         patch.object(worker,'media_playlist',return_value=data), \
+                         patch.object(worker,'http',return_value=(b'segment','https://example.test/a.ts')), \
+                         patch.object(worker,'observations',side_effect=observe):
+                        worker.stream_worker(cfg,store,threading.Event())
+                    self.assertAlmostEqual(processed[-1],expected)
+                    self.assertTrue(all(value>=0 for value in processed))
+                    self.assertEqual(store.stream(worker.stream_identity(cfg))['status'],'stream_ended')
+                    store.db.close()
+
     def test_number_without_overlay_field(self):
         detector = worker.Detector(self.cfg, {})
         for t, r in [(100, 150), (102, 148), (104, 146), (106, 144)]:

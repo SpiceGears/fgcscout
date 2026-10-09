@@ -429,6 +429,14 @@ def stream_worker(cfg, store, stop=None):
                         return
                     if seg['seq'] <= state.get('last_sequence',-1):
                         continue
+                    # YouTube can expose a short pre-roll before release_timestamp.
+                    # Its negative time is not a seekable video timestamp; skip it,
+                    # rather than pinning every retry to the first available segment.
+                    if (origin is not None and seg['pdt'] is not None and seg['pdt'] < origin
+                            and cfg.get('anchor_sequence') != seg['seq']):
+                        state['last_sequence'] = seg['seq']
+                        store.checkpoint(stream_id,state)
+                        continue
                     base = segment_start(seg,cfg,state,origin)
                     raw, _ = http(seg['url'])
                     if seg['init']:

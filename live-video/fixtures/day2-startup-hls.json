@@ -1,0 +1,27 @@
+[
+  {
+    "field": 1,
+    "origin": 1791504725,
+    "playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:11:58.953+00:00\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:13:58.953+00:00\n#EXTINF:5.0,\nsegment.ts\n"
+  },
+  {
+    "field": 2,
+    "origin": 1791504762,
+    "playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:12:34.962+00:00\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:4.938266,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXTINF:4.938266,\nsegment.ts\n#EXTINF:5.005,\nsegment.ts\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:14:34.949+00:00\n#EXTINF:5.005,\nsegment.ts\n"
+  },
+  {
+    "field": 3,
+    "origin": 1791504799,
+    "playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:13:11.922+00:00\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:15:01.922+00:00\n#EXTINF:5.0,\nsegment.ts\n"
+  },
+  {
+    "field": 4,
+    "origin": 1791504826,
+    "playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:13:39.162+00:00\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:15:39.162+00:00\n#EXTINF:5.0,\nsegment.ts\n"
+  },
+  {
+    "field": 5,
+    "origin": 1791504862,
+    "playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:14:15.603+00:00\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXTINF:5.0,\nsegment.ts\n#EXT-X-DISCONTINUITY\n#EXT-X-PROGRAM-DATE-TIME:2026-10-09T00:16:00.603+00:00\n#EXTINF:5.0,\nsegment.ts\n"
+  }
+]
