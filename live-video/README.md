@@ -98,6 +98,12 @@ calibrated UTC time of video timestamp zero. YouTube metadata and live manifests
 must be checked against the player's timeline for each broadcaster; this has not
 been verified on the upcoming 2026 streams.
 
+On startup, anchored streams are scanned from the beginning of the currently
+available HLS/DVR window, then followed live. Restarting resumes saved checkpoints;
+re-entering the same URL does not erase them. This can recover missed games still
+in that window, but cannot recover segments YouTube has already removed. Use the
+archive scanner and admin import for those after the VOD becomes available.
+
 When program date/time is absent, the worker can count segment durations if it
 observes sequence zero or knows a segment's absolute start. For example:
 
@@ -108,10 +114,11 @@ observes sequence zero or knows a segment's absolute start. For example:
 This means that **the start of HLS segment 1234** corresponds to video second 3600.
 It is not the time when the worker was started. Use `--probe` to inspect sequence
 numbers and calibrate against the player. Sequence numbering alone is never
-multiplied by a guessed segment duration. Missing anchors, missing segments and
-unanchored HLS discontinuities stop that field with a visible retry status instead
-of manufacturing timestamps. An explicit sequence anchor can resume at a
-known discontinuity. If a broadcaster restarts/reset its segment numbering, use
+multiplied by a guessed segment duration. At an HLS discontinuity, a fresh
+program date/time tag and the broadcast origin automatically re-anchor the next
+segment. A timestamp extrapolated from the previous encoding is discarded at
+the boundary. Without a fresh UTC tag or an explicit sequence anchor, that field
+reports a retry status rather than manufacturing timestamps. If a broadcaster restarts/reset its segment numbering, use
 its new watch URL or a fresh state file after recalibrating.
 
 During a live broadcast, YouTube must have DVR enabled for seeking to earlier

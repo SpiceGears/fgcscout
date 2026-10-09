@@ -74,6 +74,7 @@ def playlist(text, url):
         suitable = [v for v in variants if v[0] >= 480]
         return {'variant': min(suitable or variants)[1]}
     seq, duration, pdt, init = 0, None, None, None
+    pdt_explicit = False
     discontinuity = False
     segments = []
     for line in lines:
@@ -83,6 +84,7 @@ def playlist(text, url):
             duration = float(line.split(':', 1)[1].split(',')[0])
         elif line.startswith('#EXT-X-PROGRAM-DATE-TIME:'):
             pdt = utc(line.split(':', 1)[1])
+            pdt_explicit = True
         elif line.startswith('#EXT-X-MAP:'):
             match = re.search(r'URI="([^"]+)"', line)
             if not match:
@@ -94,16 +96,22 @@ def playlist(text, url):
             raise ValueError('Byte-range HLS is not supported')
         elif line == '#EXT-X-DISCONTINUITY':
             discontinuity = True
+            # A timestamp extrapolated from the old encoding cannot anchor a reset.
+            # Keep a fresh tag if it precedes DISCONTINUITY for this same segment.
+            if not pdt_explicit:
+                pdt = None
         elif not line.startswith('#'):
             if duration is None or not math.isfinite(duration) or duration <= 0:
                 raise ValueError('Invalid segment duration')
             segments.append({'seq': seq, 'url': urljoin(url, line), 'duration': duration,
-                             'pdt': pdt, 'init': init, 'discontinuity': discontinuity})
+                             'pdt': pdt, 'pdt_explicit': pdt_explicit,
+                             'init': init, 'discontinuity': discontinuity})
             seq += 1
             if pdt is not None:
                 pdt += duration
             duration = None
             discontinuity = False
+            pdt_explicit = False
     return {'segments': segments, 'ended': '#EXT-X-ENDLIST' in lines}
 
 
@@ -371,14 +379,16 @@ def media_playlist(url):
 
 
 def segment_start(seg, cfg, state, origin):
-    if seg['discontinuity'] and cfg.get('anchor_sequence') != seg['seq']:
-        raise ValueError('HLS discontinuity: recalibrate timeline before continuing')
-    if seg['pdt'] is not None and origin is not None:
+    anchored = cfg.get('anchor_sequence') == seg['seq']
+    absolute = seg['pdt'] is not None and origin is not None
+    if seg['discontinuity'] and not anchored and not (absolute and seg.get('pdt_explicit')):
+        raise ValueError('HLS discontinuity has no fresh UTC timestamp; configure a timeline anchor')
+    if anchored:
+        value = cfg['anchor_timestamp']
+    elif absolute:
         value = seg['pdt']-origin
     elif seg['seq'] == state.get('next_sequence'):
         value = state['next_timestamp']
-    elif seg['seq'] == cfg.get('anchor_sequence'):
-        value = cfg['anchor_timestamp']
     elif seg['seq'] == 0:
         value = 0
     else:
@@ -407,11 +417,12 @@ def stream_worker(cfg, store, stop=None):
                 data = media_playlist(source)
                 segments = data['segments']
                 if 'last_sequence' not in state and segments:
-                    # Start near the live edge, unless an explicit sequence anchor is visible.
+                    # Catch up from the available DVR window when timestamps are anchored.
+                    # This recovers an initial match after delayed startup/temporary failure.
                     anchor = cfg.get('anchor_sequence')
                     if anchor is not None and any(s['seq']==anchor for s in segments):
                         segments = [s for s in segments if s['seq']>=anchor]
-                    elif not (segments[0]['seq']==0 and origin is None):
+                    elif origin is None and segments[0]['seq'] != 0:
                         segments = segments[-12:]
                 for seg in segments:
                     if stop.is_set():
